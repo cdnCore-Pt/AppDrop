@@ -55,9 +55,17 @@ class Application extends App implements IBootstrap
             $user = $userSession->getUser();
 
             // Only show navigation entry if user has permission
-            $permissionService = $server->get(PermissionService::class);
-            if ($user === null || !$permissionService->canUpload($user)) {
-                return [];
+            if ($user === null) {
+                return null;
+            }
+
+            try {
+                $permissionService = $server->get(PermissionService::class);
+                if (!$permissionService->canUpload($user)) {
+                    return null;
+                }
+            } catch (\Throwable $e) {
+                return null;
             }
 
             $urlGenerator = $server->get(IURLGenerator::class);
