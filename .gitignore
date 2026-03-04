@@ -1,0 +1,5 @@
+/vendor/
+/build/
+/certs/
+.php-cs-fixer.cache
+composer.lock

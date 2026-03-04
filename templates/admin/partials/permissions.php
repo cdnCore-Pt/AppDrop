@@ -1,0 +1,38 @@
+<?php
+
+/**
+ * SPDX-FileCopyrightText: 2026 CDNTV
+ * SPDX-License-Identifier: AGPL-3.0-or-later
+ */
+
+/** @var \OCP\IL10N $l */
+?>
+
+<h2 class="aum-section-title"><?php p($l->t('Permissions')); ?></h2>
+<p class="aum-subtitle">
+    <?php p($l->t('Administrators always have full access. Add groups or individual users below to grant upload permission.')); ?>
+</p>
+
+<div id="aum-perm-message" class="aum-alert aum-alert--hidden" role="status" aria-live="polite"></div>
+
+<!-- Allowed Groups -->
+<div class="aum-perm-block">
+    <h3 class="aum-perm-heading"><?php p($l->t('Allowed Groups')); ?></h3>
+    <div class="aum-perm-search">
+        <input id="aum-perm-group-search" type="text" class="aum-input"
+               placeholder="<?php p($l->t('Search groups...')); ?>" autocomplete="off">
+        <div id="aum-perm-group-results" class="aum-autocomplete"></div>
+    </div>
+    <ul id="aum-perm-group-list" class="aum-perm-list"></ul>
+</div>
+
+<!-- Allowed Users -->
+<div class="aum-perm-block">
+    <h3 class="aum-perm-heading"><?php p($l->t('Allowed Users')); ?></h3>
+    <div class="aum-perm-search">
+        <input id="aum-perm-user-search" type="text" class="aum-input"
+               placeholder="<?php p($l->t('Search users...')); ?>" autocomplete="off">
+        <div id="aum-perm-user-results" class="aum-autocomplete"></div>
+    </div>
+    <ul id="aum-perm-user-list" class="aum-perm-list"></ul>
+</div>

@@ -1,0 +1,33 @@
+<?xml version="1.0"?>
+<info xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+      xsi:noNamespaceSchemaLocation="https://apps.nextcloud.com/schema/apps/info.xsd">
+    <id>appdrop</id>
+    <name>AppDrop</name>
+    <summary>Securely upload, validate and install Nextcloud app packages via the web UI</summary>
+    <description><![CDATA[
+        AppDrop allows Nextcloud administrators to upload a .zip package of a
+        Nextcloud app directly from the web UI, validate it (Zip Slip protection, MIME check,
+        appinfo/info.xml verification), extract it safely into a writable apps path, set correct
+        permissions, and enable it — all without SSH access.
+    ]]></description>
+    <version>1.2.0</version>
+    <licence>agpl</licence>
+    <author>Mehran Pourvahab</author>
+    <author>Henrique Rodrigues</author>
+    <namespace>AppDrop</namespace>
+    <category>tools</category>
+    <website>https://github.com/cdntv/appdrop</website>
+    <bugs>https://github.com/cdntv/appdrop/issues</bugs>
+    <repository type="git">https://github.com/cdntv/appdrop</repository>
+    <!-- TODO: Add <screenshot> elements after taking screenshots of the app UI -->
+    <dependencies>
+        <nextcloud min-version="30" max-version="32"/>
+        <php min-version="8.1"/>
+    </dependencies>
+    <!-- Navigation is registered dynamically in Application::register()
+         so it only appears for users with upload permission. -->
+    <settings>
+        <admin>OCA\AppDrop\Settings\AdminSettings</admin>
+        <admin-section>OCA\AppDrop\Settings\AdminSection</admin-section>
+    </settings>
+</info>

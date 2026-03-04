@@ -1,0 +1,29 @@
+{
+    "name": "nextcloud/app-uploader-manager",
+    "description": "Nextcloud app for uploading and installing app packages via the web UI",
+    "license": "AGPL-3.0-or-later",
+    "require": {
+        "php": ">=8.1"
+    },
+    "require-dev": {
+        "nextcloud/ocp": "dev-master",
+        "nextcloud/coding-standard": "^1.3",
+        "psalm/phar": "^5.0",
+        "phpunit/phpunit": "^10.0"
+    },
+    "autoload": {
+        "psr-4": {
+            "OCA\\AppDrop\\": "lib/"
+        }
+    },
+    "autoload-dev": {
+        "psr-4": {
+            "OCA\\AppDrop\\Tests\\": "tests/"
+        }
+    },
+    "config": {
+        "platform": {
+            "php": "8.1"
+        }
+    }
+}
