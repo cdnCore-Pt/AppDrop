@@ -36,6 +36,8 @@ class HealthCheckController extends Controller
 
     /**
      * Validate a zip file before installation.
+     *
+     * @NoAdminRequired
      */
     public function validate(): JSONResponse
     {

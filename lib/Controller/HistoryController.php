@@ -35,6 +35,7 @@ class HistoryController extends Controller
     /**
      * List upload history (paginated).
      *
+     * @NoAdminRequired
      * @NoCSRFRequired
      */
     public function list(): JSONResponse

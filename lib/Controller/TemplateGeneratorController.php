@@ -38,6 +38,8 @@ class TemplateGeneratorController extends Controller
 
     /**
      * Generate a Nextcloud app skeleton and return as zip download.
+     *
+     * @NoAdminRequired
      */
     public function generate(): DataDownloadResponse|JSONResponse
     {

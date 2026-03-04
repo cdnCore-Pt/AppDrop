@@ -41,6 +41,7 @@ class AdminController extends Controller
     }
 
     /**
+     * @NoAdminRequired
      * @NoCSRFRequired
      */
     public function index(): TemplateResponse
@@ -66,6 +67,8 @@ class AdminController extends Controller
 
     /**
      * Receives the zip upload, validates and installs/updates the app.
+     *
+     * @NoAdminRequired
      */
     public function install(): JSONResponse
     {
