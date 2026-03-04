@@ -321,10 +321,11 @@
     text-align: right;
 }
 
-.aum-file-item__status--validating { color: var(--color-primary, #0082c9); }
-.aum-file-item__status--installing { color: var(--color-warning, #e67e22); }
-.aum-file-item__status--success { color: var(--color-success, #28a745); }
-.aum-file-item__status--error { color: var(--color-error, #dc3545); }
+.aum-file-item__status--validating { color: #0068a3; }
+.aum-file-item__status--installing { color: #b35c00; }
+.aum-file-item__status--success { color: #1a7a35; }
+.aum-file-item__status--warning { color: #9a5500; font-weight: 600; }
+.aum-file-item__status--error { color: #b82020; font-weight: 600; }
 
 .aum-file-item__remove {
     border: none;
@@ -398,7 +399,7 @@
 }
 
 .aum-check--warn .aum-check__icon {
-    color: #bf6a00;
+    color: #a35200;
 }
 
 .aum-check__label {
@@ -408,41 +409,50 @@
 }
 
 .aum-check--pass .aum-check__label {
-    color: #1a6b32;
+    color: #156328;
 }
 
 .aum-check--fail .aum-check__label {
-    color: #c92a2a;
+    color: #b82020;
 }
 
 .aum-check--warn .aum-check__label {
-    color: #bf6a00;
+    color: #8a4800;
 }
 
 .aum-check__detail {
-    color: #444;
+    color: #333;
+}
+
+.aum-check--fail .aum-check__detail {
+    color: #7a1a1a;
+}
+
+.aum-check--warn .aum-check__detail {
+    color: #6b3a00;
 }
 
 .aum-check--pass .aum-check__detail {
-    color: #555;
+    color: #444;
 }
 
 .aum-check__fix {
     flex-basis: 100%;
     margin-left: 26px;
     font-size: 0.92em;
-    color: #555;
     font-style: italic;
     padding: 2px 0 2px 8px;
     border-left: 2px solid var(--color-border, #ddd);
 }
 
 .aum-check--fail .aum-check__fix {
-    border-left-color: #c92a2a;
+    color: #7a1a1a;
+    border-left-color: #b82020;
 }
 
 .aum-check--warn .aum-check__fix {
-    border-left-color: #bf6a00;
+    color: #6b3a00;
+    border-left-color: #a35200;
 }
 
 /* ── Dark mode overrides for checks ───────────────────────────────────── */
