@@ -9,23 +9,23 @@ declare(strict_types=1);
 
 namespace OCA\AppDrop\AppInfo;
 
+use OCA\AppDrop\Service\PermissionService;
 use OCP\AppFramework\App;
 use OCP\AppFramework\Bootstrap\IBootContext;
 use OCP\AppFramework\Bootstrap\IBootstrap;
 use OCP\AppFramework\Bootstrap\IRegistrationContext;
 use OCP\INavigationManager;
 use OCP\IURLGenerator;
+use OCP\IUserSession;
 
 /**
  * Application bootstrap for appdrop.
  *
- * Registers services in the DI container and hooks into the admin settings panel.
- * Follows the Nextcloud 30+ IBootstrap pattern (register → boot).
- *
- * Navigation is always registered; access control is enforced at the
- * controller level via PermissionService::canUpload().
- * The NavigationManager closure must always return a valid entry array
- * (returning null crashes NC 32's NavigationManager).
+ * Navigation is registered only when the current user has upload permission.
+ * We avoid using a closure with INavigationManager::add() because NC 32's
+ * NavigationManager crashes if the closure returns null or an empty array
+ * (it tries to access $entry['id'] unconditionally). Instead, we check
+ * permissions at boot() time and skip registration entirely if denied.
  */
 class Application extends App implements IBootstrap
 {
@@ -44,16 +44,28 @@ class Application extends App implements IBootstrap
     {
         $server = $context->getServerContainer();
 
-        $server->get(INavigationManager::class)->add(function () use ($server) {
-            $urlGenerator = $server->get(IURLGenerator::class);
+        try {
+            $user = $server->get(IUserSession::class)->getUser();
+            if ($user === null) {
+                return;
+            }
 
-            return [
-                'id' => self::APP_ID,
-                'name' => 'AppDrop',
-                'href' => $urlGenerator->linkToRoute('appdrop.admin.index'),
-                'icon' => $urlGenerator->imagePath(self::APP_ID, 'app.svg'),
-                'order' => 90,
-            ];
-        });
+            $permissionService = $server->get(PermissionService::class);
+            if (!$permissionService->canUpload($user)) {
+                return;
+            }
+        } catch (\Throwable) {
+            return;
+        }
+
+        $urlGenerator = $server->get(IURLGenerator::class);
+
+        $server->get(INavigationManager::class)->add([
+            'id' => self::APP_ID,
+            'name' => 'AppDrop',
+            'href' => $urlGenerator->linkToRoute('appdrop.admin.index'),
+            'icon' => $urlGenerator->imagePath(self::APP_ID, 'app.svg'),
+            'order' => 90,
+        ]);
     }
 }
