@@ -108,7 +108,7 @@ if ($isAdmin) {
                 </button>
             </div>
             <div id="app-settings-content">
-                <p class="aum-settings-version">AppDrop v1.2.0</p>
+                <p class="aum-settings-version">AppDrop v1.3.0</p>
             </div>
         </div>
     </div>

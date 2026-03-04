@@ -116,19 +116,24 @@
         pendingFiles.forEach(function (entry, idx) {
             var sizeKB = Math.round(entry.file.size / 1024);
             html += '<div class="aum-file-item" data-index="' + idx + '">'
+                + '<div class="aum-file-item__header">'
                 + '<span class="aum-file-item__icon" data-file-icon="' + idx + '"></span>'
                 + '<span class="aum-file-item__name">' + escapeHtml(entry.file.name) + '</span>'
                 + '<span class="aum-file-item__size">' + sizeKB + ' KB</span>'
                 + '<span class="aum-file-item__status" data-file-status="' + idx + '"></span>'
+                + '<button type="button" class="aum-file-item__toggle" data-toggle="' + idx + '" title="Toggle checks" style="display:none">&#9660;</button>'
                 + '<button type="button" class="aum-file-item__remove" data-remove="' + idx + '" title="Remove">&times;</button>'
+                + '</div>'
+                + '<div class="aum-checks" data-checks="' + idx + '" style="display:none"></div>'
                 + '</div>';
         });
         fileQueue.innerHTML = html;
 
-        // Re-apply any already-fetched icons and statuses
+        // Re-apply any already-fetched icons, statuses and checks
         pendingFiles.forEach(function (entry, idx) {
             if (entry.validated) {
                 showIconPreview(idx, entry.report ? entry.report.icon : null);
+                renderChecks(idx, entry.report);
                 if (entry.valid) {
                     var info = entry.report;
                     var label = (info.name || info.appId || '?') + ' v' + (info.version || '?');
@@ -152,6 +157,46 @@
                 removeFromQueue(parseInt(this.getAttribute('data-remove'), 10));
             });
         });
+
+        // Attach toggle handlers
+        fileQueue.querySelectorAll('[data-toggle]').forEach(function (btn) {
+            btn.addEventListener('click', function () {
+                var i = parseInt(this.getAttribute('data-toggle'), 10);
+                var checksEl = document.querySelector('[data-checks="' + i + '"]');
+                if (!checksEl) return;
+                var visible = checksEl.style.display !== 'none';
+                checksEl.style.display = visible ? 'none' : 'block';
+                this.innerHTML = visible ? '&#9660;' : '&#9650;';
+            });
+        });
+    }
+
+    function renderChecks(index, report) {
+        var checksEl = document.querySelector('[data-checks="' + index + '"]');
+        var toggleBtn = document.querySelector('[data-toggle="' + index + '"]');
+        if (!checksEl || !report || !report.checks || report.checks.length === 0) return;
+
+        // Show toggle button
+        if (toggleBtn) toggleBtn.style.display = '';
+
+        var html = '<div class="aum-checks__list">';
+        report.checks.forEach(function (check) {
+            var icon = check.status === 'pass' ? '✓' : (check.status === 'fail' ? '✗' : '⚠');
+            html += '<div class="aum-check aum-check--' + escapeHtml(check.status) + '">'
+                + '<span class="aum-check__icon">' + icon + '</span>'
+                + '<span class="aum-check__label">' + escapeHtml(check.label) + '</span>'
+                + '<span class="aum-check__detail">' + escapeHtml(check.detail) + '</span>'
+                + '</div>';
+        });
+        html += '</div>';
+        checksEl.innerHTML = html;
+
+        // Auto-expand if there are errors or warnings
+        var hasIssues = report.checks.some(function (c) { return c.status === 'fail' || c.status === 'warn'; });
+        if (hasIssues) {
+            checksEl.style.display = 'block';
+            if (toggleBtn) toggleBtn.innerHTML = '&#9650;';
+        }
     }
 
     // ── Immediate validation (on file add) ──────────────────────────────────
@@ -181,6 +226,9 @@
 
             // Show icon preview
             showIconPreview(index, report.icon || null);
+
+            // Render check details
+            renderChecks(index, report);
 
             // Show validation result
             if (!entry.valid) {
@@ -235,6 +283,20 @@
         if (validFiles.length === 0) {
             showMessage('error', 'No valid files to install. Fix the errors and try again.');
             return;
+        }
+
+        // Check for files with warnings — ask for confirmation
+        var filesWithWarnings = validFiles.filter(function (e) {
+            return e.report && e.report.warnings && e.report.warnings.length > 0;
+        });
+        if (filesWithWarnings.length > 0) {
+            var names = filesWithWarnings.map(function (e) { return e.file.name; }).join(', ');
+            var count = filesWithWarnings.reduce(function (sum, e) { return sum + e.report.warnings.length; }, 0);
+            var confirmed = confirm(
+                count + ' warning(s) found in: ' + names + '.\n\n'
+                + 'The app may not work correctly. Are you sure you want to install?'
+            );
+            if (!confirmed) return;
         }
 
         setLoading(true);

@@ -261,15 +261,18 @@
 }
 
 .aum-file-item {
-    display: flex;
-    align-items: center;
-    gap: 12px;
-    padding: 8px 12px;
     border: 1px solid var(--color-border, #ddd);
     border-radius: var(--border-radius, 6px);
     margin-bottom: 6px;
     background: var(--color-main-background, #fff);
     font-size: 0.9em;
+}
+
+.aum-file-item__header {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 8px 12px;
 }
 
 .aum-file-item__icon {
@@ -335,6 +338,78 @@
 
 .aum-file-item__remove:hover {
     color: var(--color-error, #dc3545);
+}
+
+.aum-file-item__toggle {
+    border: none;
+    background: none;
+    color: var(--color-text-lighter, #888);
+    cursor: pointer;
+    font-size: 0.8em;
+    padding: 0 4px;
+    line-height: 1;
+}
+
+.aum-file-item__toggle:hover {
+    color: var(--color-primary, #0082c9);
+}
+
+/* ── Health check list ─────────────────────────────────────────────────── */
+.aum-checks {
+    border-top: 1px solid var(--color-border, #eee);
+    padding: 8px 12px 12px;
+}
+
+.aum-checks__list {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.aum-check {
+    display: flex;
+    align-items: baseline;
+    gap: 8px;
+    font-size: 0.85em;
+    padding: 3px 0;
+}
+
+.aum-check__icon {
+    flex-shrink: 0;
+    width: 18px;
+    text-align: center;
+    font-weight: 700;
+    font-size: 1em;
+}
+
+.aum-check--pass .aum-check__icon {
+    color: var(--color-success, #28a745);
+}
+
+.aum-check--fail .aum-check__icon {
+    color: var(--color-error, #dc3545);
+}
+
+.aum-check--warn .aum-check__icon {
+    color: var(--color-warning, #e67e22);
+}
+
+.aum-check__label {
+    font-weight: 600;
+    flex-shrink: 0;
+    color: var(--color-main-text, #222);
+}
+
+.aum-check__detail {
+    color: var(--color-text-lighter, #666);
+}
+
+.aum-check--fail .aum-check__label {
+    color: var(--color-error, #dc3545);
+}
+
+.aum-check--warn .aum-check__label {
+    color: var(--color-warning, #e67e22);
 }
 
 /* ── Buttons ────────────────────────────────────────────────────────────── */

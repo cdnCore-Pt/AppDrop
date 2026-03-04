@@ -10,7 +10,7 @@
         appinfo/info.xml verification), extract it safely into a writable apps path, set correct
         permissions, and enable it — all without SSH access.
     ]]></description>
-    <version>1.2.0</version>
+    <version>1.3.0</version>
     <licence>agpl</licence>
     <author>Mehran Pourvahab</author>
     <author>Henrique Rodrigues</author>
