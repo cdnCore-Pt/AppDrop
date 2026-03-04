@@ -185,8 +185,11 @@
             html += '<div class="aum-check aum-check--' + escapeHtml(check.status) + '">'
                 + '<span class="aum-check__icon">' + icon + '</span>'
                 + '<span class="aum-check__label">' + escapeHtml(check.label) + '</span>'
-                + '<span class="aum-check__detail">' + escapeHtml(check.detail) + '</span>'
-                + '</div>';
+                + '<span class="aum-check__detail">' + escapeHtml(check.detail) + '</span>';
+            if (check.fix && check.status !== 'pass') {
+                html += '<span class="aum-check__fix">' + escapeHtml(check.fix) + '</span>';
+            }
+            html += '</div>';
         });
         html += '</div>';
         checksEl.innerHTML = html;

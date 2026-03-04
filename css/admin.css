@@ -363,7 +363,7 @@
 .aum-checks__list {
     display: flex;
     flex-direction: column;
-    gap: 4px;
+    gap: 2px;
 }
 
 .aum-check {
@@ -371,7 +371,14 @@
     align-items: baseline;
     gap: 8px;
     font-size: 0.85em;
-    padding: 3px 0;
+    padding: 4px 6px;
+    border-radius: 4px;
+    flex-wrap: wrap;
+}
+
+.aum-check--fail,
+.aum-check--warn {
+    background: var(--color-background-hover, #f8f8f8);
 }
 
 .aum-check__icon {
@@ -379,19 +386,19 @@
     width: 18px;
     text-align: center;
     font-weight: 700;
-    font-size: 1em;
+    font-size: 1.1em;
 }
 
 .aum-check--pass .aum-check__icon {
-    color: var(--color-success, #28a745);
+    color: #1a8a3f;
 }
 
 .aum-check--fail .aum-check__icon {
-    color: var(--color-error, #dc3545);
+    color: #c92a2a;
 }
 
 .aum-check--warn .aum-check__icon {
-    color: var(--color-warning, #e67e22);
+    color: #bf6a00;
 }
 
 .aum-check__label {
@@ -400,16 +407,92 @@
     color: var(--color-main-text, #222);
 }
 
-.aum-check__detail {
-    color: var(--color-text-lighter, #666);
+.aum-check--pass .aum-check__label {
+    color: #1a6b32;
 }
 
 .aum-check--fail .aum-check__label {
-    color: var(--color-error, #dc3545);
+    color: #c92a2a;
 }
 
 .aum-check--warn .aum-check__label {
-    color: var(--color-warning, #e67e22);
+    color: #bf6a00;
+}
+
+.aum-check__detail {
+    color: #444;
+}
+
+.aum-check--pass .aum-check__detail {
+    color: #555;
+}
+
+.aum-check__fix {
+    flex-basis: 100%;
+    margin-left: 26px;
+    font-size: 0.92em;
+    color: #555;
+    font-style: italic;
+    padding: 2px 0 2px 8px;
+    border-left: 2px solid var(--color-border, #ddd);
+}
+
+.aum-check--fail .aum-check__fix {
+    border-left-color: #c92a2a;
+}
+
+.aum-check--warn .aum-check__fix {
+    border-left-color: #bf6a00;
+}
+
+/* ── Dark mode overrides for checks ───────────────────────────────────── */
+[data-themes*="dark"] .aum-check--pass .aum-check__icon,
+.theme--dark .aum-check--pass .aum-check__icon {
+    color: #51cf66;
+}
+
+[data-themes*="dark"] .aum-check--fail .aum-check__icon,
+.theme--dark .aum-check--fail .aum-check__icon {
+    color: #ff6b6b;
+}
+
+[data-themes*="dark"] .aum-check--warn .aum-check__icon,
+.theme--dark .aum-check--warn .aum-check__icon {
+    color: #ffa94d;
+}
+
+[data-themes*="dark"] .aum-check--pass .aum-check__label,
+.theme--dark .aum-check--pass .aum-check__label {
+    color: #8ce99a;
+}
+
+[data-themes*="dark"] .aum-check--fail .aum-check__label,
+.theme--dark .aum-check--fail .aum-check__label {
+    color: #ff8787;
+}
+
+[data-themes*="dark"] .aum-check--warn .aum-check__label,
+.theme--dark .aum-check--warn .aum-check__label {
+    color: #ffc078;
+}
+
+[data-themes*="dark"] .aum-check__detail,
+.theme--dark .aum-check__detail,
+[data-themes*="dark"] .aum-check--pass .aum-check__detail,
+.theme--dark .aum-check--pass .aum-check__detail {
+    color: var(--color-text-lighter, #aaa);
+}
+
+[data-themes*="dark"] .aum-check__fix,
+.theme--dark .aum-check__fix {
+    color: var(--color-text-lighter, #aaa);
+}
+
+[data-themes*="dark"] .aum-check--fail,
+.theme--dark .aum-check--fail,
+[data-themes*="dark"] .aum-check--warn,
+.theme--dark .aum-check--warn {
+    background: rgba(255, 255, 255, 0.04);
 }
 
 /* ── Buttons ────────────────────────────────────────────────────────────── */
