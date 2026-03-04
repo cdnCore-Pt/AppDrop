@@ -154,6 +154,12 @@ class HealthCheckService
             $checks[] = ['label' => 'App ID (<id>)', 'status' => 'pass', 'detail' => $appId];
         }
 
+        // ── Self-update protection ───────────────────────────────────────────
+        if ($appId === 'appdrop') {
+            $checks[] = ['label' => 'Self-update Protection', 'status' => 'fail', 'detail' => 'Cannot update AppDrop through itself.', 'fix' => 'Update AppDrop via occ (php occ app:update appdrop), the Nextcloud app store, or by replacing the files manually with SSH.'];
+            $errors[] = 'Cannot update AppDrop through itself.';
+        }
+
         // ── App ID matches directory ─────────────────────────────────────────
         if ($appId !== '' && $topLevelPrefix !== '') {
             $dirName = rtrim($topLevelPrefix, '/');

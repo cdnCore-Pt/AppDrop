@@ -69,6 +69,14 @@ class AppInstallService
             $zipInfo = $this->validateAndAnalyzeZip($tempPath);
             $appId = $zipInfo['appId'];
 
+            // Prevent self-update: installing appdrop over itself can corrupt the running app
+            if ($appId === self::APP_ID) {
+                throw new AppInstallException(
+                    'Cannot update AppDrop through itself. '
+                    . 'Please update via occ, the Nextcloud app store, or by replacing the files manually.',
+                );
+            }
+
             $basePath = $this->pathResolver->resolveWritablePath();
             $targetPath = $basePath . '/' . $appId;
 
