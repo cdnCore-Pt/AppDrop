@@ -80,4 +80,4 @@ AGPL-3.0-or-later
 ## Authors
 
 - Mehran Pourvahab
-- Henrique Rodrigues
+- [Henrique Rodrigues](https://github.com/HenriqueRamos13)
