@@ -17,163 +17,155 @@ use OCP\IRequest;
 use OCP\IUserManager;
 use OCP\IUserSession;
 
-class PermissionController extends Controller
-{
-    use AdminAuthTrait;
+class PermissionController extends Controller {
+	use AdminAuthTrait;
 
-    public function __construct(
-        string $appName,
-        IRequest $request,
-        private readonly IUserSession $userSession,
-        private readonly IGroupManager $groupManager,
-        private readonly PermissionService $permissionService,
-        private readonly IUserManager $userManager,
-    ) {
-        parent::__construct($appName, $request);
-    }
+	public function __construct(
+		string $appName,
+		IRequest $request,
+		private readonly IUserSession $userSession,
+		private readonly IGroupManager $groupManager,
+		private readonly PermissionService $permissionService,
+		private readonly IUserManager $userManager,
+	) {
+		parent::__construct($appName, $request);
+	}
 
-    /**
-     * Get current permissions (allowed users and groups).
-     *
-     * @NoCSRFRequired
-     */
-    public function get(): JSONResponse
-    {
-        $denied = $this->denyIfNotAdmin();
-        if ($denied !== null) {
-            return $denied;
-        }
+	/**
+	 * Get current permissions (allowed users and groups).
+	 *
+	 * @NoCSRFRequired
+	 */
+	public function get(): JSONResponse {
+		$denied = $this->denyIfNotAdmin();
+		if ($denied !== null) {
+			return $denied;
+		}
 
-        return new JSONResponse([
-            'success' => true,
-            'users' => $this->permissionService->getAllowedUsers(),
-            'groups' => $this->permissionService->getAllowedGroups(),
-        ]);
-    }
+		return new JSONResponse([
+			'success' => true,
+			'users' => $this->permissionService->getAllowedUsers(),
+			'groups' => $this->permissionService->getAllowedGroups(),
+		]);
+	}
 
-    public function addUser(): JSONResponse
-    {
-        $denied = $this->denyIfNotAdmin();
-        if ($denied !== null) {
-            return $denied;
-        }
+	public function addUser(): JSONResponse {
+		$denied = $this->denyIfNotAdmin();
+		if ($denied !== null) {
+			return $denied;
+		}
 
-        $params = json_decode(file_get_contents('php://input'), true) ?? [];
-        $userId = trim($params['userId'] ?? '');
-        if ($userId === '') {
-            return new JSONResponse(['success' => false, 'message' => 'Missing userId parameter.'], 400);
-        }
+		$params = json_decode(file_get_contents('php://input'), true) ?? [];
+		$userId = trim($params['userId'] ?? '');
+		if ($userId === '') {
+			return new JSONResponse(['success' => false, 'message' => 'Missing userId parameter.'], 400);
+		}
 
-        $this->permissionService->addUser($userId);
-        return new JSONResponse(['success' => true, 'message' => "User '{$userId}' added."]);
-    }
+		$this->permissionService->addUser($userId);
+		return new JSONResponse(['success' => true, 'message' => "User '{$userId}' added."]);
+	}
 
-    public function removeUser(): JSONResponse
-    {
-        $denied = $this->denyIfNotAdmin();
-        if ($denied !== null) {
-            return $denied;
-        }
+	public function removeUser(): JSONResponse {
+		$denied = $this->denyIfNotAdmin();
+		if ($denied !== null) {
+			return $denied;
+		}
 
-        $params = json_decode(file_get_contents('php://input'), true) ?? [];
-        $userId = trim($params['userId'] ?? '');
-        if ($userId === '') {
-            return new JSONResponse(['success' => false, 'message' => 'Missing userId parameter.'], 400);
-        }
+		$params = json_decode(file_get_contents('php://input'), true) ?? [];
+		$userId = trim($params['userId'] ?? '');
+		if ($userId === '') {
+			return new JSONResponse(['success' => false, 'message' => 'Missing userId parameter.'], 400);
+		}
 
-        $this->permissionService->removeUser($userId);
-        return new JSONResponse(['success' => true, 'message' => "User '{$userId}' removed."]);
-    }
+		$this->permissionService->removeUser($userId);
+		return new JSONResponse(['success' => true, 'message' => "User '{$userId}' removed."]);
+	}
 
-    public function addGroup(): JSONResponse
-    {
-        $denied = $this->denyIfNotAdmin();
-        if ($denied !== null) {
-            return $denied;
-        }
+	public function addGroup(): JSONResponse {
+		$denied = $this->denyIfNotAdmin();
+		if ($denied !== null) {
+			return $denied;
+		}
 
-        $params = json_decode(file_get_contents('php://input'), true) ?? [];
-        $groupId = trim($params['groupId'] ?? '');
-        if ($groupId === '') {
-            return new JSONResponse(['success' => false, 'message' => 'Missing groupId parameter.'], 400);
-        }
+		$params = json_decode(file_get_contents('php://input'), true) ?? [];
+		$groupId = trim($params['groupId'] ?? '');
+		if ($groupId === '') {
+			return new JSONResponse(['success' => false, 'message' => 'Missing groupId parameter.'], 400);
+		}
 
-        $this->permissionService->addGroup($groupId);
-        return new JSONResponse(['success' => true, 'message' => "Group '{$groupId}' added."]);
-    }
+		$this->permissionService->addGroup($groupId);
+		return new JSONResponse(['success' => true, 'message' => "Group '{$groupId}' added."]);
+	}
 
-    public function removeGroup(): JSONResponse
-    {
-        $denied = $this->denyIfNotAdmin();
-        if ($denied !== null) {
-            return $denied;
-        }
+	public function removeGroup(): JSONResponse {
+		$denied = $this->denyIfNotAdmin();
+		if ($denied !== null) {
+			return $denied;
+		}
 
-        $params = json_decode(file_get_contents('php://input'), true) ?? [];
-        $groupId = trim($params['groupId'] ?? '');
-        if ($groupId === '') {
-            return new JSONResponse(['success' => false, 'message' => 'Missing groupId parameter.'], 400);
-        }
+		$params = json_decode(file_get_contents('php://input'), true) ?? [];
+		$groupId = trim($params['groupId'] ?? '');
+		if ($groupId === '') {
+			return new JSONResponse(['success' => false, 'message' => 'Missing groupId parameter.'], 400);
+		}
 
-        $this->permissionService->removeGroup($groupId);
-        return new JSONResponse(['success' => true, 'message' => "Group '{$groupId}' removed."]);
-    }
+		$this->permissionService->removeGroup($groupId);
+		return new JSONResponse(['success' => true, 'message' => "Group '{$groupId}' removed."]);
+	}
 
-    /**
-     * Search users for autocomplete.
-     *
-     * @NoCSRFRequired
-     */
-    public function searchUsers(): JSONResponse
-    {
-        $denied = $this->denyIfNotAdmin();
-        if ($denied !== null) {
-            return $denied;
-        }
+	/**
+	 * Search users for autocomplete.
+	 *
+	 * @NoCSRFRequired
+	 */
+	public function searchUsers(): JSONResponse {
+		$denied = $this->denyIfNotAdmin();
+		if ($denied !== null) {
+			return $denied;
+		}
 
-        $term = trim($this->request->getParam('term', ''));
-        if ($term === '') {
-            return new JSONResponse(['success' => true, 'results' => []]);
-        }
+		$term = trim($this->request->getParam('term', ''));
+		if ($term === '') {
+			return new JSONResponse(['success' => true, 'results' => []]);
+		}
 
-        $results = [];
-        $users = $this->userManager->searchDisplayName($term, 20);
-        foreach ($users as $user) {
-            $results[] = [
-                'id' => $user->getUID(),
-                'displayName' => $user->getDisplayName(),
-            ];
-        }
+		$results = [];
+		$users = $this->userManager->searchDisplayName($term, 20);
+		foreach ($users as $user) {
+			$results[] = [
+				'id' => $user->getUID(),
+				'displayName' => $user->getDisplayName(),
+			];
+		}
 
-        return new JSONResponse(['success' => true, 'results' => $results]);
-    }
+		return new JSONResponse(['success' => true, 'results' => $results]);
+	}
 
-    /**
-     * Search groups for autocomplete.
-     *
-     * @NoCSRFRequired
-     */
-    public function searchGroups(): JSONResponse
-    {
-        $denied = $this->denyIfNotAdmin();
-        if ($denied !== null) {
-            return $denied;
-        }
+	/**
+	 * Search groups for autocomplete.
+	 *
+	 * @NoCSRFRequired
+	 */
+	public function searchGroups(): JSONResponse {
+		$denied = $this->denyIfNotAdmin();
+		if ($denied !== null) {
+			return $denied;
+		}
 
-        $term = trim($this->request->getParam('term', ''));
-        if ($term === '') {
-            return new JSONResponse(['success' => true, 'results' => []]);
-        }
+		$term = trim($this->request->getParam('term', ''));
+		if ($term === '') {
+			return new JSONResponse(['success' => true, 'results' => []]);
+		}
 
-        $results = [];
-        $groups = $this->groupManager->search($term, 20);
-        foreach ($groups as $group) {
-            $results[] = [
-                'id' => $group->getGID(),
-                'displayName' => $group->getDisplayName(),
-            ];
-        }
+		$results = [];
+		$groups = $this->groupManager->search($term, 20);
+		foreach ($groups as $group) {
+			$results[] = [
+				'id' => $group->getGID(),
+				'displayName' => $group->getDisplayName(),
+			];
+		}
 
-        return new JSONResponse(['success' => true, 'results' => $results]);
-    }
+		return new JSONResponse(['success' => true, 'results' => $results]);
+	}
 }

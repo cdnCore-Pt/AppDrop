@@ -17,88 +17,83 @@ use OCP\IGroupManager;
 use OCP\IRequest;
 use OCP\IUserSession;
 
-class BackupController extends Controller
-{
-    use AdminAuthTrait;
+class BackupController extends Controller {
+	use AdminAuthTrait;
 
-    public function __construct(
-        string $appName,
-        IRequest $request,
-        private readonly IUserSession $userSession,
-        private readonly IGroupManager $groupManager,
-        private readonly BackupService $backupService,
-    ) {
-        parent::__construct($appName, $request);
-    }
+	public function __construct(
+		string $appName,
+		IRequest $request,
+		private readonly IUserSession $userSession,
+		private readonly IGroupManager $groupManager,
+		private readonly BackupService $backupService,
+	) {
+		parent::__construct($appName, $request);
+	}
 
-    /**
-     * List all backups.
-     */
-    public function list(): JSONResponse
-    {
-        $denied = $this->denyIfNotAdmin();
-        if ($denied !== null) {
-            return $denied;
-        }
+	/**
+	 * List all backups.
+	 */
+	public function list(): JSONResponse {
+		$denied = $this->denyIfNotAdmin();
+		if ($denied !== null) {
+			return $denied;
+		}
 
-        try {
-            $backups = $this->backupService->listBackups();
-            return new JSONResponse(['success' => true, 'backups' => $backups]);
-        } catch (\Throwable $e) {
-            return new JSONResponse(['success' => false, 'message' => $e->getMessage()]);
-        }
-    }
+		try {
+			$backups = $this->backupService->listBackups();
+			return new JSONResponse(['success' => true, 'backups' => $backups]);
+		} catch (\Throwable $e) {
+			return new JSONResponse(['success' => false, 'message' => $e->getMessage()]);
+		}
+	}
 
-    /**
-     * Restore a backup.
-     */
-    public function restore(): JSONResponse
-    {
-        $denied = $this->denyIfNotAdmin();
-        if ($denied !== null) {
-            return $denied;
-        }
+	/**
+	 * Restore a backup.
+	 */
+	public function restore(): JSONResponse {
+		$denied = $this->denyIfNotAdmin();
+		if ($denied !== null) {
+			return $denied;
+		}
 
-        $dirName = $this->getDirNameFromRequest();
-        if ($dirName === null) {
-            return new JSONResponse(['success' => false, 'message' => 'Missing dirName parameter.']);
-        }
+		$dirName = $this->getDirNameFromRequest();
+		if ($dirName === null) {
+			return new JSONResponse(['success' => false, 'message' => 'Missing dirName parameter.']);
+		}
 
-        try {
-            $this->backupService->restore($dirName);
-            return new JSONResponse(['success' => true, 'message' => "Backup '{$dirName}' restored."]);
-        } catch (AppInstallException $e) {
-            return new JSONResponse(['success' => false, 'message' => $e->getMessage()]);
-        }
-    }
+		try {
+			$this->backupService->restore($dirName);
+			return new JSONResponse(['success' => true, 'message' => "Backup '{$dirName}' restored."]);
+		} catch (AppInstallException $e) {
+			return new JSONResponse(['success' => false, 'message' => $e->getMessage()]);
+		}
+	}
 
-    /**
-     * Delete a backup.
-     */
-    public function delete(): JSONResponse
-    {
-        $denied = $this->denyIfNotAdmin();
-        if ($denied !== null) {
-            return $denied;
-        }
+	/**
+	 * Delete a backup.
+	 */
+	public function delete(): JSONResponse {
+		$denied = $this->denyIfNotAdmin();
+		if ($denied !== null) {
+			return $denied;
+		}
 
-        $dirName = $this->getDirNameFromRequest();
-        if ($dirName === null) {
-            return new JSONResponse(['success' => false, 'message' => 'Missing dirName parameter.']);
-        }
+		$dirName = $this->getDirNameFromRequest();
+		if ($dirName === null) {
+			return new JSONResponse(['success' => false, 'message' => 'Missing dirName parameter.']);
+		}
 
-        try {
-            $this->backupService->delete($dirName);
-            return new JSONResponse(['success' => true, 'message' => "Backup '{$dirName}' deleted."]);
-        } catch (AppInstallException $e) {
-            return new JSONResponse(['success' => false, 'message' => $e->getMessage()]);
-        }
-    }
+		try {
+			$this->backupService->delete($dirName);
+			return new JSONResponse(['success' => true, 'message' => "Backup '{$dirName}' deleted."]);
+		} catch (AppInstallException $e) {
+			return new JSONResponse(['success' => false, 'message' => $e->getMessage()]);
+		}
+	}
 
-    private function getDirNameFromRequest(): ?string
-    {
-        $params = json_decode(file_get_contents('php://input'), true) ?? [];
-        $dirName = trim($params['dirName'] ?? '');
-        return $dirName !== '' ? $dirName : null;
-    }
+	private function getDirNameFromRequest(): ?string {
+		$params = json_decode(file_get_contents('php://input'), true) ?? [];
+		$dirName = trim($params['dirName'] ?? '');
+		return $dirName !== '' ? $dirName : null;
+	}
 }

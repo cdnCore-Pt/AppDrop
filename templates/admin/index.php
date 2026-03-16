@@ -21,7 +21,7 @@ $isAdmin = $_['isAdmin'] ?? false;
 \OCP\Util::addScript('appdrop', 'templates');
 \OCP\Util::addScript('appdrop', 'backups');
 if ($isAdmin) {
-    \OCP\Util::addScript('appdrop', 'permissions');
+	\OCP\Util::addScript('appdrop', 'permissions');
 }
 ?>
 

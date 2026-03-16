@@ -14,49 +14,48 @@ use OCP\ITempManager;
 /**
  * Generates a Nextcloud app skeleton as a .zip download.
  */
-class TemplateGeneratorService
-{
-    public function __construct(
-        private readonly ITempManager $tempManager,
-    ) {
-    }
+class TemplateGeneratorService {
+	public function __construct(
+		private readonly ITempManager $tempManager,
+	) {
+	}
 
-    /**
-     * Generate an app skeleton zip.
-     *
-     * @param string $appId     App ID (snake_case)
-     * @param string $appName   Display name
-     * @param string $namespace PHP namespace (PascalCase)
-     * @param string $version   Version string
-     * @param string $author    Author name
-     * @param string $description App description
-     * @return string Path to generated zip file
-     */
-    public function generate(
-        string $appId,
-        string $appName,
-        string $namespace,
-        string $version = '1.0.0',
-        string $author = '',
-        string $description = '',
-    ): string {
-        $tmpPath = $this->tempManager->getTemporaryFile('.zip');
-        if ($tmpPath === false || $tmpPath === null) {
-            throw new AppInstallException('Could not create temporary file for zip.');
-        }
+	/**
+	 * Generate an app skeleton zip.
+	 *
+	 * @param string $appId App ID (snake_case)
+	 * @param string $appName Display name
+	 * @param string $namespace PHP namespace (PascalCase)
+	 * @param string $version Version string
+	 * @param string $author Author name
+	 * @param string $description App description
+	 * @return string Path to generated zip file
+	 */
+	public function generate(
+		string $appId,
+		string $appName,
+		string $namespace,
+		string $version = '1.0.0',
+		string $author = '',
+		string $description = '',
+	): string {
+		$tmpPath = $this->tempManager->getTemporaryFile('.zip');
+		if ($tmpPath === false || $tmpPath === null) {
+			throw new AppInstallException('Could not create temporary file for zip.');
+		}
 
-        $zip = new \ZipArchive();
-        if ($zip->open($tmpPath, \ZipArchive::CREATE | \ZipArchive::OVERWRITE) !== true) {
-            throw new AppInstallException('Could not create zip archive.');
-        }
+		$zip = new \ZipArchive();
+		if ($zip->open($tmpPath, \ZipArchive::CREATE | \ZipArchive::OVERWRITE) !== true) {
+			throw new AppInstallException('Could not create zip archive.');
+		}
 
-        $year = date('Y');
-        $authorXml = $author !== '' ? $author : 'Your Name';
-        $descriptionXml = $description !== '' ? htmlspecialchars($description, ENT_XML1) : "A custom Nextcloud app.";
+		$year = date('Y');
+		$authorXml = $author !== '' ? $author : 'Your Name';
+		$descriptionXml = $description !== '' ? htmlspecialchars($description, ENT_XML1) : 'A custom Nextcloud app.';
 
-        // appinfo/info.xml
-        $zip->addFromString($appId . '/appinfo/info.xml', sprintf(
-            '<?xml version="1.0"?>
+		// appinfo/info.xml
+		$zip->addFromString($appId . '/appinfo/info.xml', sprintf(
+			'<?xml version="1.0"?>
 <info xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
       xsi:noNamespaceSchemaLocation="https://apps.nextcloud.com/schema/apps/info.xsd">
     <id>%1$s</id>
@@ -81,17 +80,17 @@ class TemplateGeneratorService
     </navigations>
 </info>
 ',
-            $appId,
-            htmlspecialchars($appName, ENT_XML1),
-            $descriptionXml,
-            htmlspecialchars($version, ENT_XML1),
-            htmlspecialchars($authorXml, ENT_XML1),
-            htmlspecialchars($namespace, ENT_XML1),
-        ));
+			$appId,
+			htmlspecialchars($appName, ENT_XML1),
+			$descriptionXml,
+			htmlspecialchars($version, ENT_XML1),
+			htmlspecialchars($authorXml, ENT_XML1),
+			htmlspecialchars($namespace, ENT_XML1),
+		));
 
-        // appinfo/routes.php
-        $zip->addFromString($appId . '/appinfo/routes.php', sprintf(
-            '<?php
+		// appinfo/routes.php
+		$zip->addFromString($appId . '/appinfo/routes.php', sprintf(
+			'<?php
 
 declare(strict_types=1);
 
@@ -101,11 +100,11 @@ return [
     ],
 ];
 ',
-        ));
+		));
 
-        // lib/AppInfo/Application.php
-        $zip->addFromString($appId . '/lib/AppInfo/Application.php', sprintf(
-            '<?php
+		// lib/AppInfo/Application.php
+		$zip->addFromString($appId . '/lib/AppInfo/Application.php', sprintf(
+			'<?php
 
 declare(strict_types=1);
 
@@ -134,13 +133,13 @@ class Application extends App implements IBootstrap
     }
 }
 ',
-            $namespace,
-            $appId,
-        ));
+			$namespace,
+			$appId,
+		));
 
-        // lib/Controller/PageController.php
-        $zip->addFromString($appId . '/lib/Controller/PageController.php', sprintf(
-            '<?php
+		// lib/Controller/PageController.php
+		$zip->addFromString($appId . '/lib/Controller/PageController.php', sprintf(
+			'<?php
 
 declare(strict_types=1);
 
@@ -167,13 +166,13 @@ class PageController extends Controller
     }
 }
 ',
-            $namespace,
-            $appId,
-        ));
+			$namespace,
+			$appId,
+		));
 
-        // templates/main.php
-        $zip->addFromString($appId . '/templates/main.php', sprintf(
-            '<?php
+		// templates/main.php
+		$zip->addFromString($appId . '/templates/main.php', sprintf(
+			'<?php
 
 declare(strict_types=1);
 
@@ -188,13 +187,13 @@ declare(strict_types=1);
     <p><?php p($l->t(\'Welcome to your new app!\')); ?></p>
 </div>
 ',
-            $appId,
-            $appName,
-        ));
+			$appId,
+			$appName,
+		));
 
-        // css/style.css
-        $zip->addFromString($appId . '/css/style.css', sprintf(
-            '/**
+		// css/style.css
+		$zip->addFromString($appId . '/css/style.css', sprintf(
+			'/**
  * %s — Styles
  */
 
@@ -204,13 +203,13 @@ declare(strict_types=1);
     padding: 0 16px;
 }
 ',
-            $appName,
-            $appId,
-        ));
+			$appName,
+			$appId,
+		));
 
-        // js/script.js
-        $zip->addFromString($appId . '/js/script.js', sprintf(
-            '/**
+		// js/script.js
+		$zip->addFromString($appId . '/js/script.js', sprintf(
+			'/**
  * %1$s — Client-side logic
  */
 
@@ -219,20 +218,20 @@ declare(strict_types=1);
     console.log(\'%1$s loaded\');
 }());
 ',
-            $appId,
-        ));
+			$appId,
+		));
 
-        // img/app.svg (simple icon)
-        $zip->addFromString($appId . '/img/app.svg',
-            '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32">'
-            . '<rect width="32" height="32" rx="6" fill="#0082c9"/>'
-            . '<text x="16" y="22" text-anchor="middle" fill="white" font-size="18" font-family="sans-serif">'
-            . strtoupper(substr($appId, 0, 1))
-            . '</text></svg>',
-        );
+		// img/app.svg (simple icon)
+		$zip->addFromString($appId . '/img/app.svg',
+			'<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32">'
+			. '<rect width="32" height="32" rx="6" fill="#0082c9"/>'
+			. '<text x="16" y="22" text-anchor="middle" fill="white" font-size="18" font-family="sans-serif">'
+			. strtoupper(substr($appId, 0, 1))
+			. '</text></svg>',
+		);
 
-        $zip->close();
+		$zip->close();
 
-        return $tmpPath;
-    }
+		return $tmpPath;
+	}
 }

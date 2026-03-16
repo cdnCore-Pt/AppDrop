@@ -27,24 +27,22 @@ use OCP\AppFramework\Db\Entity;
  * @method int getCreatedAt()
  * @method void setCreatedAt(int $createdAt)
  */
-class UploadHistory extends Entity
-{
-    protected string $appId = '';
-    protected string $version = '';
-    protected string $filename = '';
-    protected string $result = '';
-    protected string $message = '';
-    protected string $userId = '';
-    protected int $createdAt = 0;
+class UploadHistory extends Entity {
+	protected string $appId = '';
+	protected string $version = '';
+	protected string $filename = '';
+	protected string $result = '';
+	protected string $message = '';
+	protected string $userId = '';
+	protected int $createdAt = 0;
 
-    public function __construct()
-    {
-        $this->addType('appId', 'string');
-        $this->addType('version', 'string');
-        $this->addType('filename', 'string');
-        $this->addType('result', 'string');
-        $this->addType('message', 'string');
-        $this->addType('userId', 'string');
-        $this->addType('createdAt', 'integer');
-    }
+	public function __construct() {
+		$this->addType('appId', 'string');
+		$this->addType('version', 'string');
+		$this->addType('filename', 'string');
+		$this->addType('result', 'string');
+		$this->addType('message', 'string');
+		$this->addType('userId', 'string');
+		$this->addType('createdAt', 'integer');
+	}
 }

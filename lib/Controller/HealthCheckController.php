@@ -15,61 +15,59 @@ use OCP\AppFramework\Controller;
 use OCP\AppFramework\Http\JSONResponse;
 use OCP\IGroupManager;
 use OCP\IRequest;
-use OCP\IUserSession;
 use OCP\ITempManager;
+use OCP\IUserSession;
 
-class HealthCheckController extends Controller
-{
-    use AdminAuthTrait;
+class HealthCheckController extends Controller {
+	use AdminAuthTrait;
 
-    public function __construct(
-        string $appName,
-        IRequest $request,
-        private readonly IUserSession $userSession,
-        private readonly IGroupManager $groupManager,
-        private readonly HealthCheckService $healthCheckService,
-        private readonly ITempManager $tempManager,
-        private readonly PermissionService $permissionService,
-    ) {
-        parent::__construct($appName, $request);
-    }
+	public function __construct(
+		string $appName,
+		IRequest $request,
+		private readonly IUserSession $userSession,
+		private readonly IGroupManager $groupManager,
+		private readonly HealthCheckService $healthCheckService,
+		private readonly ITempManager $tempManager,
+		private readonly PermissionService $permissionService,
+	) {
+		parent::__construct($appName, $request);
+	}
 
-    /**
-     * Validate a zip file before installation.
-     *
-     * @NoAdminRequired
-     */
-    public function validate(): JSONResponse
-    {
-        $denied = $this->denyIfCannotUpload();
-        if ($denied !== null) {
-            return $denied;
-        }
+	/**
+	 * Validate a zip file before installation.
+	 *
+	 * @NoAdminRequired
+	 */
+	public function validate(): JSONResponse {
+		$denied = $this->denyIfCannotUpload();
+		if ($denied !== null) {
+			return $denied;
+		}
 
-        $file = $this->request->getUploadedFile('zipFile');
-        if ($file === null || empty($file['tmp_name'])) {
-            return new JSONResponse(['errors' => ['No file uploaded.'], 'warnings' => []]);
-        }
+		$file = $this->request->getUploadedFile('zipFile');
+		if ($file === null || empty($file['tmp_name'])) {
+			return new JSONResponse(['errors' => ['No file uploaded.'], 'warnings' => []]);
+		}
 
-        // Store to temp for analysis
-        $tmpPath = $this->tempManager->getTemporaryFile('.zip');
-        if ($tmpPath === false || $tmpPath === null) {
-            return new JSONResponse(['errors' => ['Could not create temporary file.'], 'warnings' => []]);
-        }
+		// Store to temp for analysis
+		$tmpPath = $this->tempManager->getTemporaryFile('.zip');
+		if ($tmpPath === false || $tmpPath === null) {
+			return new JSONResponse(['errors' => ['Could not create temporary file.'], 'warnings' => []]);
+		}
 
-        if (!move_uploaded_file($file['tmp_name'], $tmpPath)) {
-            if (!copy($file['tmp_name'], $tmpPath)) {
-                return new JSONResponse(['errors' => ['Could not store uploaded file.'], 'warnings' => []]);
-            }
-        }
+		if (!move_uploaded_file($file['tmp_name'], $tmpPath)) {
+			if (!copy($file['tmp_name'], $tmpPath)) {
+				return new JSONResponse(['errors' => ['Could not store uploaded file.'], 'warnings' => []]);
+			}
+		}
 
-        try {
-            $report = $this->healthCheckService->analyze($tmpPath);
-            return new JSONResponse($report);
-        } finally {
-            if (file_exists($tmpPath)) {
-                @unlink($tmpPath);
-            }
-        }
-    }
+		try {
+			$report = $this->healthCheckService->analyze($tmpPath);
+			return new JSONResponse($report);
+		} finally {
+			if (file_exists($tmpPath)) {
+				@unlink($tmpPath);
+			}
+		}
+	}
 }

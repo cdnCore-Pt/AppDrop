@@ -10,125 +10,116 @@ use OCP\ITempManager;
 use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
 
-class TemplateGeneratorServiceTest extends TestCase
-{
-    private ITempManager&MockObject $tempManager;
-    private TemplateGeneratorService $service;
-    private string $tmpDir;
+class TemplateGeneratorServiceTest extends TestCase {
+	private ITempManager&MockObject $tempManager;
+	private TemplateGeneratorService $service;
+	private string $tmpDir;
 
-    protected function setUp(): void
-    {
-        $this->tempManager = $this->createMock(ITempManager::class);
-        $this->service = new TemplateGeneratorService($this->tempManager);
-        $this->tmpDir = sys_get_temp_dir() . '/appdrop_gen_' . uniqid();
-        mkdir($this->tmpDir, 0755, true);
-    }
+	protected function setUp(): void {
+		$this->tempManager = $this->createMock(ITempManager::class);
+		$this->service = new TemplateGeneratorService($this->tempManager);
+		$this->tmpDir = sys_get_temp_dir() . '/appdrop_gen_' . uniqid();
+		mkdir($this->tmpDir, 0755, true);
+	}
 
-    protected function tearDown(): void
-    {
-        array_map('unlink', glob($this->tmpDir . '/*') ?: []);
-        @rmdir($this->tmpDir);
-    }
+	protected function tearDown(): void {
+		array_map('unlink', glob($this->tmpDir . '/*') ?: []);
+		@rmdir($this->tmpDir);
+	}
 
-    public function testGenerateCreatesValidZip(): void
-    {
-        $tmpPath = $this->tmpDir . '/skeleton.zip';
-        $this->tempManager->method('getTemporaryFile')->willReturn($tmpPath);
+	public function testGenerateCreatesValidZip(): void {
+		$tmpPath = $this->tmpDir . '/skeleton.zip';
+		$this->tempManager->method('getTemporaryFile')->willReturn($tmpPath);
 
-        $result = $this->service->generate('my_app', 'My App', 'MyApp');
+		$result = $this->service->generate('my_app', 'My App', 'MyApp');
 
-        $this->assertFileExists($result);
+		$this->assertFileExists($result);
 
-        $zip = new \ZipArchive();
-        $this->assertTrue($zip->open($result) === true);
+		$zip = new \ZipArchive();
+		$this->assertTrue($zip->open($result) === true);
 
-        $this->assertNotFalse($zip->locateName('my_app/appinfo/info.xml'));
-        $this->assertNotFalse($zip->locateName('my_app/appinfo/routes.php'));
-        $this->assertNotFalse($zip->locateName('my_app/lib/AppInfo/Application.php'));
-        $this->assertNotFalse($zip->locateName('my_app/lib/Controller/PageController.php'));
-        $this->assertNotFalse($zip->locateName('my_app/templates/main.php'));
-        $this->assertNotFalse($zip->locateName('my_app/css/style.css'));
-        $this->assertNotFalse($zip->locateName('my_app/js/script.js'));
-        $this->assertNotFalse($zip->locateName('my_app/img/app.svg'));
+		$this->assertNotFalse($zip->locateName('my_app/appinfo/info.xml'));
+		$this->assertNotFalse($zip->locateName('my_app/appinfo/routes.php'));
+		$this->assertNotFalse($zip->locateName('my_app/lib/AppInfo/Application.php'));
+		$this->assertNotFalse($zip->locateName('my_app/lib/Controller/PageController.php'));
+		$this->assertNotFalse($zip->locateName('my_app/templates/main.php'));
+		$this->assertNotFalse($zip->locateName('my_app/css/style.css'));
+		$this->assertNotFalse($zip->locateName('my_app/js/script.js'));
+		$this->assertNotFalse($zip->locateName('my_app/img/app.svg'));
 
-        $zip->close();
-    }
+		$zip->close();
+	}
 
-    public function testGenerateInfoXmlContainsCorrectData(): void
-    {
-        $tmpPath = $this->tmpDir . '/skeleton.zip';
-        $this->tempManager->method('getTemporaryFile')->willReturn($tmpPath);
+	public function testGenerateInfoXmlContainsCorrectData(): void {
+		$tmpPath = $this->tmpDir . '/skeleton.zip';
+		$this->tempManager->method('getTemporaryFile')->willReturn($tmpPath);
 
-        $this->service->generate('calc_app', 'Calculator', 'CalcApp', '2.0.0', 'John', 'A calc');
+		$this->service->generate('calc_app', 'Calculator', 'CalcApp', '2.0.0', 'John', 'A calc');
 
-        $zip = new \ZipArchive();
-        $zip->open($tmpPath);
-        $infoXml = $zip->getFromName('calc_app/appinfo/info.xml');
-        $zip->close();
+		$zip = new \ZipArchive();
+		$zip->open($tmpPath);
+		$infoXml = $zip->getFromName('calc_app/appinfo/info.xml');
+		$zip->close();
 
-        $this->assertStringContainsString('<id>calc_app</id>', $infoXml);
-        $this->assertStringContainsString('<name>Calculator</name>', $infoXml);
-        $this->assertStringContainsString('<version>2.0.0</version>', $infoXml);
-        $this->assertStringContainsString('<author>John</author>', $infoXml);
-        $this->assertStringContainsString('<namespace>CalcApp</namespace>', $infoXml);
-    }
+		$this->assertStringContainsString('<id>calc_app</id>', $infoXml);
+		$this->assertStringContainsString('<name>Calculator</name>', $infoXml);
+		$this->assertStringContainsString('<version>2.0.0</version>', $infoXml);
+		$this->assertStringContainsString('<author>John</author>', $infoXml);
+		$this->assertStringContainsString('<namespace>CalcApp</namespace>', $infoXml);
+	}
 
-    public function testGenerateApplicationPhpUsesCorrectNamespace(): void
-    {
-        $tmpPath = $this->tmpDir . '/skeleton.zip';
-        $this->tempManager->method('getTemporaryFile')->willReturn($tmpPath);
+	public function testGenerateApplicationPhpUsesCorrectNamespace(): void {
+		$tmpPath = $this->tmpDir . '/skeleton.zip';
+		$this->tempManager->method('getTemporaryFile')->willReturn($tmpPath);
 
-        $this->service->generate('my_app', 'My App', 'MyApp');
+		$this->service->generate('my_app', 'My App', 'MyApp');
 
-        $zip = new \ZipArchive();
-        $zip->open($tmpPath);
-        $appPhp = $zip->getFromName('my_app/lib/AppInfo/Application.php');
-        $zip->close();
+		$zip = new \ZipArchive();
+		$zip->open($tmpPath);
+		$appPhp = $zip->getFromName('my_app/lib/AppInfo/Application.php');
+		$zip->close();
 
-        $this->assertStringContainsString('namespace OCA\MyApp\AppInfo;', $appPhp);
-        $this->assertStringContainsString("public const APP_ID = 'my_app';", $appPhp);
-    }
+		$this->assertStringContainsString('namespace OCA\MyApp\AppInfo;', $appPhp);
+		$this->assertStringContainsString("public const APP_ID = 'my_app';", $appPhp);
+	}
 
-    public function testGenerateUsesDefaultsForOptionalParams(): void
-    {
-        $tmpPath = $this->tmpDir . '/skeleton.zip';
-        $this->tempManager->method('getTemporaryFile')->willReturn($tmpPath);
+	public function testGenerateUsesDefaultsForOptionalParams(): void {
+		$tmpPath = $this->tmpDir . '/skeleton.zip';
+		$this->tempManager->method('getTemporaryFile')->willReturn($tmpPath);
 
-        $this->service->generate('my_app', 'My App', 'MyApp');
+		$this->service->generate('my_app', 'My App', 'MyApp');
 
-        $zip = new \ZipArchive();
-        $zip->open($tmpPath);
-        $infoXml = $zip->getFromName('my_app/appinfo/info.xml');
-        $zip->close();
+		$zip = new \ZipArchive();
+		$zip->open($tmpPath);
+		$infoXml = $zip->getFromName('my_app/appinfo/info.xml');
+		$zip->close();
 
-        $this->assertStringContainsString('<version>1.0.0</version>', $infoXml);
-        $this->assertStringContainsString('<author>Your Name</author>', $infoXml);
-    }
+		$this->assertStringContainsString('<version>1.0.0</version>', $infoXml);
+		$this->assertStringContainsString('<author>Your Name</author>', $infoXml);
+	}
 
-    public function testGenerateThrowsOnTempFileFailure(): void
-    {
-        $this->tempManager->method('getTemporaryFile')->willReturn(false);
+	public function testGenerateThrowsOnTempFileFailure(): void {
+		$this->tempManager->method('getTemporaryFile')->willReturn(false);
 
-        $this->expectException(AppInstallException::class);
-        $this->expectExceptionMessage('Could not create temporary file');
+		$this->expectException(AppInstallException::class);
+		$this->expectExceptionMessage('Could not create temporary file');
 
-        $this->service->generate('my_app', 'My App', 'MyApp');
-    }
+		$this->service->generate('my_app', 'My App', 'MyApp');
+	}
 
-    public function testGenerateEscapesXmlEntities(): void
-    {
-        $tmpPath = $this->tmpDir . '/skeleton.zip';
-        $this->tempManager->method('getTemporaryFile')->willReturn($tmpPath);
+	public function testGenerateEscapesXmlEntities(): void {
+		$tmpPath = $this->tmpDir . '/skeleton.zip';
+		$this->tempManager->method('getTemporaryFile')->willReturn($tmpPath);
 
-        $this->service->generate('my_app', 'My <App>', 'MyApp', '1.0.0', '', 'A "cool" & useful app');
+		$this->service->generate('my_app', 'My <App>', 'MyApp', '1.0.0', '', 'A "cool" & useful app');
 
-        $zip = new \ZipArchive();
-        $zip->open($tmpPath);
-        $infoXml = $zip->getFromName('my_app/appinfo/info.xml');
-        $zip->close();
+		$zip = new \ZipArchive();
+		$zip->open($tmpPath);
+		$infoXml = $zip->getFromName('my_app/appinfo/info.xml');
+		$zip->close();
 
-        $this->assertStringContainsString('My &lt;App&gt;', $infoXml);
-        // ENT_XML1 escapes <, >, & but not quotes
-        $this->assertStringContainsString('A "cool" &amp; useful app', $infoXml);
-    }
+		$this->assertStringContainsString('My &lt;App&gt;', $infoXml);
+		// ENT_XML1 escapes <, >, & but not quotes
+		$this->assertStringContainsString('A "cool" &amp; useful app', $infoXml);
+	}
 }

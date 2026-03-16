@@ -13,7 +13,7 @@ lint:
 	cd $(CURDIR) && ./vendor/bin/php-cs-fixer fix --dry-run --diff
 
 psalm:
-	cd $(CURDIR) && ./vendor/bin/psalm
+	cd $(CURDIR) && php vendor/psalm/phar/psalm.phar --no-cache
 
 package: clean
 	mkdir -p $(build_dir)/$(app_name)

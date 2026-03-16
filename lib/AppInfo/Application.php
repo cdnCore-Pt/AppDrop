@@ -27,45 +27,41 @@ use OCP\IUserSession;
  * (it tries to access $entry['id'] unconditionally). Instead, we check
  * permissions at boot() time and skip registration entirely if denied.
  */
-class Application extends App implements IBootstrap
-{
-    public const APP_ID = 'appdrop';
+class Application extends App implements IBootstrap {
+	public const APP_ID = 'appdrop';
 
-    public function __construct(array $urlParams = [])
-    {
-        parent::__construct(self::APP_ID, $urlParams);
-    }
+	public function __construct(array $urlParams = []) {
+		parent::__construct(self::APP_ID, $urlParams);
+	}
 
-    public function register(IRegistrationContext $context): void
-    {
-    }
+	public function register(IRegistrationContext $context): void {
+	}
 
-    public function boot(IBootContext $context): void
-    {
-        $server = $context->getServerContainer();
+	public function boot(IBootContext $context): void {
+		$server = $context->getServerContainer();
 
-        try {
-            $user = $server->get(IUserSession::class)->getUser();
-            if ($user === null) {
-                return;
-            }
+		try {
+			$user = $server->get(IUserSession::class)->getUser();
+			if ($user === null) {
+				return;
+			}
 
-            $permissionService = $server->get(PermissionService::class);
-            if (!$permissionService->canUpload($user)) {
-                return;
-            }
-        } catch (\Throwable) {
-            return;
-        }
+			$permissionService = $server->get(PermissionService::class);
+			if (!$permissionService->canUpload($user)) {
+				return;
+			}
+		} catch (\Throwable) {
+			return;
+		}
 
-        $urlGenerator = $server->get(IURLGenerator::class);
+		$urlGenerator = $server->get(IURLGenerator::class);
 
-        $server->get(INavigationManager::class)->add([
-            'id' => self::APP_ID,
-            'name' => 'AppDrop',
-            'href' => $urlGenerator->linkToRoute('appdrop.admin.index'),
-            'icon' => $urlGenerator->imagePath(self::APP_ID, 'app.svg'),
-            'order' => 90,
-        ]);
-    }
+		$server->get(INavigationManager::class)->add([
+			'id' => self::APP_ID,
+			'name' => 'AppDrop',
+			'href' => $urlGenerator->linkToRoute('appdrop.admin.index'),
+			'icon' => $urlGenerator->imagePath(self::APP_ID, 'app.svg'),
+			'order' => 90,
+		]);
+	}
 }
