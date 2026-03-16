@@ -6,6 +6,7 @@ namespace OCA\AppDrop\Tests\Unit\Service;
 
 use OCA\AppDrop\Service\AppInstallException;
 use OCA\AppDrop\Service\AppInstallService;
+use OCA\AppDrop\Service\AppPathResolver;
 use OCP\App\IAppManager;
 use OCP\IConfig;
 use OCP\ITempManager;
@@ -16,23 +17,26 @@ use Psr\Log\LoggerInterface;
 
 class AppInstallServiceTest extends TestCase
 {
-    private IConfig&MockObject $config;
+    private AppPathResolver&MockObject $pathResolver;
     private ITempManager&MockObject $tempManager;
     private IAppManager&MockObject $appManager;
+    private IConfig&MockObject $config;
     private LoggerInterface&MockObject $logger;
     private AppInstallService $service;
 
     protected function setUp(): void
     {
-        $this->config = $this->createMock(IConfig::class);
+        $this->pathResolver = $this->createMock(AppPathResolver::class);
         $this->tempManager = $this->createMock(ITempManager::class);
         $this->appManager = $this->createMock(IAppManager::class);
+        $this->config = $this->createMock(IConfig::class);
         $this->logger = $this->createMock(LoggerInterface::class);
 
         $this->service = new AppInstallService(
-            $this->config,
+            $this->pathResolver,
             $this->tempManager,
             $this->appManager,
+            $this->config,
             $this->logger,
         );
     }
@@ -77,18 +81,8 @@ class AppInstallServiceTest extends TestCase
         ]);
     }
 
-    public function testInstallThrowsOnFileTooLarge(): void
+    public function testInstallThrowsOnInvalidMimeType(): void
     {
-        // Create a temp file that reports as too large
-        $tmp = tempnam(sys_get_temp_dir(), 'test_');
-        // Write 1 byte - we'll test with a file that exists but need to check size logic
-        // The actual size check is > 20MB, so a small file won't trigger it.
-        // Instead, we test by verifying the validation flow accepts a small valid zip.
-        // For the too-large case, we need a file > 20MB which is impractical in a unit test.
-        // We'll skip the size test and focus on testable validations.
-        @unlink($tmp);
-
-        // Instead, test that a file with wrong MIME type is rejected
         $this->expectException(AppInstallException::class);
         $this->expectExceptionMessage('Invalid file type');
 
@@ -113,7 +107,6 @@ class AppInstallServiceTest extends TestCase
     #[DataProvider('validAppIdProvider')]
     public function testValidAppIdPattern(string $appId): void
     {
-        // Verify the pattern used in the service accepts valid IDs
         $this->assertMatchesRegularExpression('/^[a-z0-9_]{3,64}$/', $appId);
     }
 
@@ -132,7 +125,6 @@ class AppInstallServiceTest extends TestCase
     #[DataProvider('invalidAppIdProvider')]
     public function testInvalidAppIdPattern(string $appId): void
     {
-        // Verify the pattern rejects invalid IDs
         $this->assertDoesNotMatchRegularExpression('/^[a-z0-9_]{3,64}$/', $appId);
     }
 

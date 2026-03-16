@@ -1,17 +1,24 @@
 # AppDrop
 
+[![CI](https://github.com/cdnCore-Pt/AppDrop/actions/workflows/ci.yml/badge.svg)](https://github.com/cdnCore-Pt/AppDrop/actions/workflows/ci.yml)
+[![License: AGPL v3](https://img.shields.io/badge/License-AGPL_v3-blue.svg)](https://www.gnu.org/licenses/agpl-3.0)
+[![Nextcloud: 30-32](https://img.shields.io/badge/Nextcloud-30--32-0082c9.svg)](https://apps.nextcloud.com/apps/appdrop)
+[![PHP: 8.1+](https://img.shields.io/badge/PHP-8.1%2B-777BB4.svg)](https://www.php.net/)
+
 Upload, validate and install Nextcloud app packages (.zip) directly from the web UI — no SSH required.
+
+![AppDrop Upload UI](screenshots/upload.png)
 
 ## Features
 
 - **Drag & drop upload** — Upload one or multiple .zip app packages with drag & drop or file picker
-- **Pre-install validation** — Health check analyzes the zip before installing (Zip Slip protection, MIME check, info.xml verification, PHP/NC version compatibility)
+- **Pre-install validation** — Analyzes the zip before installing: structure checks, security validation, version compatibility, with actionable fix hints for every issue found
 - **Automatic backups** — Existing apps are backed up before updates, with restore and delete options
 - **App Manager** — List, enable, disable and remove installed custom apps
-- **Template Generator** — Generate and download a Nextcloud app skeleton .zip ready to develop
-- **Upload History** — Database-backed log of all uploads with pagination
+- **Template Generator** — Generate and download a ready-to-develop Nextcloud app skeleton
+- **Upload History** — Log of all uploads with status and timestamps
 - **Permission system** — Admins can grant upload access to specific users and groups
-- **Dark mode** — Full support via Nextcloud CSS variables
+- **Dark & light theme** — Full support via Nextcloud CSS variables
 
 ## Requirements
 
@@ -20,79 +27,51 @@ Upload, validate and install Nextcloud app packages (.zip) directly from the web
 
 ## Installation
 
-Copy the `appdrop` directory into your Nextcloud `custom_apps/` folder and enable it:
+### From the Nextcloud App Store
+
+Search for **AppDrop** in your Nextcloud app store and click **Install**.
+
+### Manual
+
+1. Download the latest release from [GitHub](https://github.com/cdnCore-Pt/AppDrop/releases)
+2. Extract it into your Nextcloud `custom_apps/` directory
+3. Enable it: **Administration Settings > Apps > AppDrop > Enable**
+
+Or via command line:
 
 ```bash
 php occ app:enable appdrop
 ```
 
-Or upload it to itself via an already-running AppDrop instance.
-
 ## Usage
 
-Once enabled, **AppDrop** appears in the top navigation bar for users with permission (admins always have access).
+Once enabled, **AppDrop** appears in the top navigation bar.
 
-The UI has the following sections:
+### Uploading an app
 
-| Section | Access | Description |
+1. Open AppDrop from the navigation bar
+2. Drag a .zip file onto the upload zone (or click to browse)
+3. A health check runs automatically, showing a detailed checklist
+4. Click **Install / Update**
+5. If the app already exists, a backup is created automatically before updating
+
+### Sections
+
+| Section | Who can access | What it does |
 |---|---|---|
-| **Upload** | Permitted users | Drag & drop .zip packages to install or update apps |
-| **Apps** | Admin only | Manage installed custom apps (enable/disable/remove) |
-| **History** | Permitted users | View past uploads with status and timestamps |
-| **Generator** | Permitted users | Generate a Nextcloud app skeleton .zip |
-| **Backups** | Admin only | View, restore or delete backups created during updates |
-| **Permissions** | Admin only | Grant/revoke upload access to users and groups |
+| **Upload** | Permitted users | Install or update apps from .zip packages |
+| **Apps** | Admins | Enable, disable or remove installed custom apps |
+| **History** | Permitted users | View past uploads with status |
+| **Generator** | Permitted users | Download a Nextcloud app skeleton to start developing |
+| **Backups** | Admins | Restore or delete backups from previous updates |
+| **Permissions** | Admins | Grant or revoke upload access to users and groups |
 
-Settings (max upload size) are available in **Administration Settings → AppDrop**.
+### Settings
 
-## Security
+In **Administration Settings > AppDrop** you can configure:
 
-- Zip Slip protection (absolute paths and directory traversal rejected)
-- MIME type validation (only zip archives accepted)
-- File size limits (configurable, default 20 MB)
-- App ID format validation (lowercase alphanumeric + underscore, 3–64 chars)
-- CSRF protection on all POST routes
-- Admin-only enforcement on management endpoints
-
-## Project Structure
-
-```
-appdrop/
-├── appinfo/
-│   ├── info.xml                        # App metadata
-│   └── routes.php                      # Route definitions
-├── lib/
-│   ├── AppInfo/Application.php         # Bootstrap (IBootstrap)
-│   ├── Controller/
-│   │   ├── AdminController.php         # Main page + upload install
-│   │   ├── AppManagerController.php    # List/enable/disable/remove apps
-│   │   ├── BackupController.php        # Backup list/restore/delete
-│   │   ├── HealthCheckController.php   # Pre-install validation
-│   │   ├── HistoryController.php       # Upload history
-│   │   ├── PermissionController.php    # User/group permission CRUD
-│   │   ├── SettingsController.php      # App settings
-│   │   └── TemplateGeneratorController.php  # Skeleton generator
-│   ├── Db/
-│   │   ├── UploadHistory.php           # Entity
-│   │   └── UploadHistoryMapper.php     # Mapper
-│   ├── Migration/                      # Database migrations
-│   ├── Service/
-│   │   ├── AppInstallService.php       # Upload, validate, extract, enable
-│   │   ├── AppManagerService.php       # App list/enable/disable/remove
-│   │   ├── AppPathResolver.php         # Writable apps path resolution
-│   │   ├── BackupService.php           # Backup management
-│   │   ├── HealthCheckService.php      # Zip analysis and validation
-│   │   ├── PermissionService.php       # User/group access control
-│   │   ├── TemplateGeneratorService.php # App skeleton zip generation
-│   │   └── UploadHistoryService.php    # History persistence
-│   └── Settings/
-│       ├── AdminSection.php            # Admin settings section
-│       └── AdminSettings.php           # Admin settings form
-├── templates/                          # PHP view templates
-├── js/                                 # Client-side scripts
-├── css/                                # Styles
-└── img/                                # App icon
-```
+- **Max upload size** (default: 20 MB)
+- **Auto-enable apps** after installation
 
 ## License
 

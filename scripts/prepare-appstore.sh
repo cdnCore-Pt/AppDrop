@@ -79,8 +79,8 @@ generate_keys() {
         [[ "${answer}" =~ ^[Yy]$ ]] || { info "Keeping existing key."; return 0; }
     fi
 
-    info "Generating 2048-bit RSA private key..."
-    openssl genrsa -out "${PRIVATE_KEY}" 2048
+    info "Generating 4096-bit RSA private key..."
+    openssl genrsa -out "${PRIVATE_KEY}" 4096
     chmod 600 "${PRIVATE_KEY}"
     ok "Private key saved to ${PRIVATE_KEY}"
 
@@ -166,6 +166,11 @@ build_package() {
         --exclude='.nextcloudignore' \
         --exclude='.gitignore' \
         --exclude='HOW_TO_DEPLOY_TO_APPSTORE.md' \
+        --exclude='article-nextcloud-custom-app.md' \
+        --exclude='CONTRIBUTING.md' \
+        --exclude='SECURITY.md' \
+        --exclude='.phpunit.result.cache' \
+        --exclude='screenshots' \
         "${APP_DIR}/" "${BUILD_DIR}/${APP_ID}/"
 
     cd "${BUILD_DIR}"

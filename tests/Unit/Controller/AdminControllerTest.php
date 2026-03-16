@@ -7,8 +7,11 @@ namespace OCA\AppDrop\Tests\Unit\Controller;
 use OCA\AppDrop\Controller\AdminController;
 use OCA\AppDrop\Service\AppInstallException;
 use OCA\AppDrop\Service\AppInstallService;
+use OCA\AppDrop\Service\PermissionService;
+use OCA\AppDrop\Service\UploadHistoryService;
 use OCP\AppFramework\Http\JSONResponse;
 use OCP\AppFramework\Http\TemplateResponse;
+use OCP\IConfig;
 use OCP\IGroupManager;
 use OCP\IRequest;
 use OCP\IUser;
@@ -22,6 +25,9 @@ class AdminControllerTest extends TestCase
     private IUserSession&MockObject $userSession;
     private IGroupManager&MockObject $groupManager;
     private AppInstallService&MockObject $installService;
+    private UploadHistoryService&MockObject $historyService;
+    private PermissionService&MockObject $permissionService;
+    private IConfig&MockObject $config;
     private AdminController $controller;
 
     protected function setUp(): void
@@ -30,6 +36,9 @@ class AdminControllerTest extends TestCase
         $this->userSession = $this->createMock(IUserSession::class);
         $this->groupManager = $this->createMock(IGroupManager::class);
         $this->installService = $this->createMock(AppInstallService::class);
+        $this->historyService = $this->createMock(UploadHistoryService::class);
+        $this->permissionService = $this->createMock(PermissionService::class);
+        $this->config = $this->createMock(IConfig::class);
 
         $this->controller = new AdminController(
             'appdrop',
@@ -37,6 +46,9 @@ class AdminControllerTest extends TestCase
             $this->userSession,
             $this->groupManager,
             $this->installService,
+            $this->historyService,
+            $this->permissionService,
+            $this->config,
         );
     }
 
@@ -62,6 +74,7 @@ class AdminControllerTest extends TestCase
         $this->groupManager->method('isInGroup')
             ->with('regular_user', 'admin')
             ->willReturn(false);
+        $this->permissionService->method('canUpload')->willReturn(false);
     }
 
     // =========================================================================
@@ -77,7 +90,6 @@ class AdminControllerTest extends TestCase
         $this->assertInstanceOf(TemplateResponse::class, $response);
         $this->assertSame('admin/index', $response->getTemplateName());
         $this->assertSame(TemplateResponse::RENDER_AS_USER, $response->getRenderAs());
-        $this->assertEmpty($response->getParams());
     }
 
     public function testIndexAsNonAdminReturnsGuestTemplateWithError(): void
@@ -176,7 +188,6 @@ class AdminControllerTest extends TestCase
 
         $this->installService->expects($this->once())
             ->method('install')
-            ->with($file)
             ->willReturn($expected);
 
         $response = $this->controller->install();

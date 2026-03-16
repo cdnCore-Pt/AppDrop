@@ -27,7 +27,7 @@ cd custom_apps/appdrop
 ```
 
 The script will:
-- Generate a 2048-bit RSA private key at `certs/appdrop.key`
+- Generate a 4096-bit RSA private key at `certs/appdrop.key`
 - Generate a CSR at `certs/appdrop.csr`
 - Print the CSR content for you to copy
 
@@ -69,7 +69,7 @@ curl -X POST https://apps.nextcloud.com/api/v1/apps/releases \
   -H "Authorization: Token YOUR_APPSTORE_TOKEN" \
   -H "Content-Type: application/json" \
   -d '{
-    "download": "https://github.com/cdntv/appdrop/releases/download/v1.2.0/appdrop-1.2.0.tar.gz",
+    "download": "https://github.com/cdnCore-Pt/AppDrop/releases/download/v1.2.0/appdrop-1.2.0.tar.gz",
     "signature": "PASTE_SIGNATURE_HERE",
     "nightly": false
   }'
@@ -109,7 +109,7 @@ For each new version:
 mkdir -p certs
 
 # Generate private key (NEVER commit this)
-openssl genrsa -out certs/appdrop.key 2048
+openssl genrsa -out certs/appdrop.key 4096
 chmod 600 certs/appdrop.key
 
 # Generate CSR
@@ -182,6 +182,11 @@ rsync -a \
   --exclude='.nextcloudignore' \
   --exclude='.gitignore' \
   --exclude='HOW_TO_DEPLOY_TO_APPSTORE.md' \
+  --exclude='article-nextcloud-custom-app.md' \
+  --exclude='CONTRIBUTING.md' \
+  --exclude='SECURITY.md' \
+  --exclude='.phpunit.result.cache' \
+  --exclude='screenshots' \
   appdrop/ appdrop/build/appdrop/
 
 cd appdrop/build
@@ -216,7 +221,7 @@ gh release create v1.2.0 \
 
 The download URL will be:
 ```
-https://github.com/cdntv/appdrop/releases/download/v1.2.0/appdrop-1.2.0.tar.gz
+https://github.com/cdnCore-Pt/AppDrop/releases/download/v1.2.0/appdrop-1.2.0.tar.gz
 ```
 
 ### Step 6: Generate release signature
@@ -240,7 +245,7 @@ curl -X POST https://apps.nextcloud.com/api/v1/apps/releases \
   -H "Authorization: Token YOUR_APPSTORE_TOKEN" \
   -H "Content-Type: application/json" \
   -d '{
-    "download": "https://github.com/cdntv/appdrop/releases/download/v1.2.0/appdrop-1.2.0.tar.gz",
+    "download": "https://github.com/cdnCore-Pt/AppDrop/releases/download/v1.2.0/appdrop-1.2.0.tar.gz",
     "signature": "PASTE_SIGNATURE_HERE",
     "nightly": false
   }'
@@ -263,8 +268,8 @@ Before or after publishing, add screenshots to improve visibility:
 4. Add `<screenshot>` elements to `info.xml`:
 
 ```xml
-<screenshot>https://raw.githubusercontent.com/cdntv/appdrop/main/screenshots/upload.png</screenshot>
-<screenshot>https://raw.githubusercontent.com/cdntv/appdrop/main/screenshots/permissions.png</screenshot>
+<screenshot>https://raw.githubusercontent.com/cdnCore-Pt/AppDrop/main/screenshots/upload.png</screenshot>
+<screenshot>https://raw.githubusercontent.com/cdnCore-Pt/AppDrop/main/screenshots/permissions.png</screenshot>
 ```
 
 ---

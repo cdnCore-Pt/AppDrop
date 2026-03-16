@@ -5,6 +5,20 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.3.0] - 2026-03-04
+
+### Added
+- Detailed health check checklist with visual indicators and per-check status
+- Fix hints in health check results to guide users on resolving issues
+- Self-update prevention: blocks uploading AppDrop through itself
+
+### Fixed
+- Always register navigation entry to prevent Nextcloud 32 crash
+- Icon color for light theme compatibility
+- Hide navigation from users without upload permission
+- Add `@NoAdminRequired` to controllers to allow permitted non-admin users
+- Strengthen warning/error colors for better contrast in light theme
+
 ## [1.2.0] - 2026-03-04
 
 ### Added
