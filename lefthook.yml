@@ -1,0 +1,9 @@
+pre-push:
+  parallel: true
+  jobs:
+    - name: phpunit
+      run: ./vendor/bin/phpunit
+    - name: php-cs-fixer
+      run: ./vendor/bin/php-cs-fixer fix --dry-run --diff
+    - name: psalm
+      run: php vendor/psalm/phar/psalm.phar --no-cache
