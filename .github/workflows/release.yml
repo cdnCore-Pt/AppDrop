@@ -1,0 +1,127 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+jobs:
+  tests:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        php-version: ['8.1', '8.2', '8.3']
+    name: PHPUnit (PHP ${{ matrix.php-version }})
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: ${{ matrix.php-version }}
+          extensions: dom, xml, xmlwriter, mbstring, zip, json
+          coverage: none
+
+      - name: Install dependencies
+        run: composer install --no-interaction --prefer-dist
+
+      - name: Run tests
+        run: ./vendor/bin/phpunit
+
+  psalm:
+    runs-on: ubuntu-latest
+    name: Psalm static analysis
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.3'
+          extensions: dom, xml, xmlwriter, mbstring, zip, json
+          coverage: none
+
+      - name: Install dependencies
+        run: composer install --no-interaction --prefer-dist
+
+      - name: Run Psalm
+        run: php vendor/psalm/phar/psalm.phar --no-cache
+
+  lint:
+    runs-on: ubuntu-latest
+    name: PHP-CS-Fixer
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.3'
+          extensions: dom, xml, xmlwriter, mbstring, zip, json
+          coverage: none
+
+      - name: Install dependencies
+        run: composer install --no-interaction --prefer-dist
+
+      - name: Check code style
+        run: ./vendor/bin/php-cs-fixer fix --dry-run --diff
+
+  release:
+    runs-on: ubuntu-latest
+    needs: [tests, psalm, lint]
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Extract version from tag
+        id: version
+        run: echo "version=${GITHUB_REF_NAME#v}" >> "$GITHUB_OUTPUT"
+
+      - name: Verify version matches info.xml
+        run: |
+          xml_version=$(grep '<version>' appinfo/info.xml | sed 's/.*<version>\(.*\)<\/version>.*/\1/' | tr -d '[:space:]')
+          tag_version="${{ steps.version.outputs.version }}"
+          if [ "$xml_version" != "$tag_version" ]; then
+            echo "::error::Tag version ($tag_version) does not match info.xml version ($xml_version)"
+            exit 1
+          fi
+
+      - name: Build .tar.gz package
+        run: |
+          mkdir -p build/appdrop
+          rsync -a \
+            --exclude='build' \
+            --exclude='certs' \
+            --exclude='scripts' \
+            --exclude='.git' \
+            --exclude='.github' \
+            --exclude='tests' \
+            --exclude='node_modules' \
+            --exclude='vendor' \
+            --exclude='psalm.xml' \
+            --exclude='phpunit.xml' \
+            --exclude='.php-cs-fixer.dist.php' \
+            --exclude='.php-cs-fixer.cache' \
+            --exclude='composer.lock' \
+            --exclude='composer.json' \
+            --exclude='Makefile' \
+            --exclude='krankerl.toml' \
+            --exclude='.nextcloudignore' \
+            --exclude='.gitignore' \
+            --exclude='HOW_TO_DEPLOY_TO_APPSTORE.md' \
+            --exclude='article-nextcloud-custom-app.md' \
+            --exclude='CONTRIBUTING.md' \
+            --exclude='SECURITY.md' \
+            --exclude='.phpunit.result.cache' \
+            --exclude='screenshots' \
+            --exclude='lefthook.yml' \
+            ./ build/appdrop/
+          cd build && tar -czf "appdrop-${{ steps.version.outputs.version }}.tar.gz" appdrop
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          name: AppDrop v${{ steps.version.outputs.version }}
+          generate_release_notes: true
+          files: build/appdrop-${{ steps.version.outputs.version }}.tar.gz
