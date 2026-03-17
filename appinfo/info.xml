@@ -3,10 +3,10 @@
       xsi:noNamespaceSchemaLocation="https://apps.nextcloud.com/schema/apps/info.xsd">
     <id>appdrop</id>
     <name>AppDrop</name>
-    <summary>Securely upload, validate and install Nextcloud app packages via the web UI</summary>
+    <summary>Securely upload, validate and install custom Nextcloud app packages via the web UI</summary>
     <description><![CDATA[
         AppDrop allows Nextcloud administrators to upload a .zip package of a
-        Nextcloud app directly from the web UI, validate it (Zip Slip protection, MIME check,
+        custom Nextcloud app directly from the web UI, validate it (Zip Slip protection, MIME check,
         appinfo/info.xml verification), extract it safely into a writable apps path, set correct
         permissions, and enable it — all without SSH access.
     ]]></description>

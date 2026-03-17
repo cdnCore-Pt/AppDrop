@@ -5,13 +5,13 @@
 [![Nextcloud: 30-32](https://img.shields.io/badge/Nextcloud-30--32-0082c9.svg)](https://apps.nextcloud.com/apps/appdrop)
 [![PHP: 8.1+](https://img.shields.io/badge/PHP-8.1%2B-777BB4.svg)](https://www.php.net/)
 
-Upload, validate and install Nextcloud app packages (.zip) directly from the web UI — no SSH required.
+Upload, validate and install custom Nextcloud app packages (.zip) directly from the web UI — no SSH required.
 
 ![AppDrop Upload UI](screenshots/upload.png)
 
 ## Features
 
-- **Drag & drop upload** — Upload one or multiple .zip app packages with drag & drop or file picker
+- **Drag & drop upload** — Upload one or multiple custom .zip app packages with drag & drop or file picker
 - **Pre-install validation** — Analyzes the zip before installing: structure checks, security validation, version compatibility, with actionable fix hints for every issue found
 - **Automatic backups** — Existing apps are backed up before updates, with restore and delete options
 - **App Manager** — List, enable, disable and remove installed custom apps
@@ -59,7 +59,7 @@ Once enabled, **AppDrop** appears in the top navigation bar.
 
 | Section | Who can access | What it does |
 |---|---|---|
-| **Upload** | Permitted users | Install or update apps from .zip packages |
+| **Upload** | Permitted users | Install or update custom apps from .zip packages |
 | **Apps** | Admins | Enable, disable or remove installed custom apps |
 | **History** | Permitted users | View past uploads with status |
 | **Generator** | Permitted users | Download a Nextcloud app skeleton to start developing |
