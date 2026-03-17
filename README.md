@@ -79,5 +79,5 @@ AGPL-3.0-or-later
 
 ## Authors
 
-- Mehran Pourvahab
+- [Mehran Pourvahab](https://mehran.pt)
 - [Henrique Rodrigues](https://github.com/HenriqueRamos13)
