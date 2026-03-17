@@ -1,0 +1,984 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AppDrop — Nextcloud App Installer</title>
+    <meta name="description" content="Upload, validate and install Nextcloud app packages directly from the web UI — no SSH required.">
+    <meta name="theme-color" content="#0082c9">
+    <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='6' fill='%230082c9'/%3E%3Cpath d='M16 6l-7 7h4.5v7h5v-7H23z' fill='%23fff'/%3E%3Crect x='7' y='23' width='18' height='2.5' rx='1' fill='%23fff'/%3E%3C/svg%3E">
+    <style>
+        :root {
+            --nc-blue: #0082c9;
+            --nc-blue-dark: #006aa3;
+            --nc-blue-light: #e8f4fd;
+            --nc-bg: #f6f6f6;
+            --nc-card: #ffffff;
+            --nc-text: #222;
+            --nc-text-muted: #666;
+            --nc-border: #e0e0e0;
+            --nc-success: #46ba61;
+            --nc-warn: #e9a030;
+            --nc-error: #e9322d;
+            --radius: 16px;
+            --shadow: 0 2px 16px rgba(0,0,0,0.06);
+            --shadow-lg: 0 8px 32px rgba(0,0,0,0.10);
+        }
+
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        html { scroll-behavior: smooth; }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            color: var(--nc-text);
+            background: var(--nc-bg);
+            line-height: 1.6;
+            -webkit-font-smoothing: antialiased;
+        }
+
+        /* ── NAV ── */
+        nav {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 64px;
+            background: rgba(255,255,255,0.85);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            border-bottom: 1px solid var(--nc-border);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 0 clamp(1rem, 4vw, 3rem);
+            z-index: 100;
+        }
+        .nav-logo {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            font-weight: 700;
+            font-size: 1.15rem;
+            color: var(--nc-text);
+            text-decoration: none;
+        }
+        .nav-logo svg { width: 30px; height: 30px; }
+        .nav-links { display: flex; gap: 1.5rem; align-items: center; }
+        .nav-links a {
+            color: var(--nc-text-muted);
+            text-decoration: none;
+            font-size: 0.9rem;
+            font-weight: 500;
+            transition: color 0.2s;
+        }
+        .nav-links a:hover { color: var(--nc-blue); }
+        .nav-cta {
+            background: var(--nc-blue) !important;
+            color: #fff !important;
+            padding: 8px 20px;
+            border-radius: 8px;
+            font-weight: 600 !important;
+            transition: background 0.2s !important;
+        }
+        .nav-cta:hover { background: var(--nc-blue-dark) !important; }
+
+        .nav-hamburger {
+            display: none;
+            background: none;
+            border: none;
+            cursor: pointer;
+            padding: 4px;
+        }
+        .nav-hamburger svg { width: 28px; height: 28px; stroke: var(--nc-text); }
+
+        /* ── HERO ── */
+        .hero {
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            text-align: center;
+            padding: 100px clamp(1rem, 5vw, 3rem) 60px;
+            background: linear-gradient(160deg, #f0f8ff 0%, #e8f4fd 30%, #fff 70%);
+            position: relative;
+            overflow: hidden;
+        }
+        .hero::before {
+            content: '';
+            position: absolute;
+            width: 600px;
+            height: 600px;
+            background: radial-gradient(circle, rgba(0,130,201,0.06) 0%, transparent 70%);
+            top: -100px;
+            right: -100px;
+            border-radius: 50%;
+        }
+        .hero-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            background: var(--nc-card);
+            border: 1px solid var(--nc-border);
+            padding: 6px 16px;
+            border-radius: 100px;
+            font-size: 0.85rem;
+            color: var(--nc-text-muted);
+            margin-bottom: 1.5rem;
+            box-shadow: var(--shadow);
+        }
+        .hero-badge span { color: var(--nc-blue); font-weight: 600; }
+        .hero h1 {
+            font-size: clamp(2.5rem, 6vw, 4rem);
+            font-weight: 800;
+            line-height: 1.1;
+            margin-bottom: 1rem;
+            letter-spacing: -0.02em;
+        }
+        .hero h1 .highlight {
+            background: linear-gradient(135deg, var(--nc-blue), #00b4d8);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+        .hero p {
+            font-size: clamp(1.05rem, 2vw, 1.25rem);
+            color: var(--nc-text-muted);
+            max-width: 600px;
+            margin-bottom: 2rem;
+        }
+        .hero-buttons {
+            display: flex;
+            gap: 1rem;
+            flex-wrap: wrap;
+            justify-content: center;
+        }
+        .btn {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            padding: 14px 28px;
+            border-radius: 12px;
+            font-size: 1rem;
+            font-weight: 600;
+            text-decoration: none;
+            transition: all 0.2s;
+            border: none;
+            cursor: pointer;
+        }
+        .btn-primary {
+            background: var(--nc-blue);
+            color: #fff;
+            box-shadow: 0 4px 16px rgba(0,130,201,0.3);
+        }
+        .btn-primary:hover {
+            background: var(--nc-blue-dark);
+            transform: translateY(-1px);
+            box-shadow: 0 6px 20px rgba(0,130,201,0.4);
+        }
+        .btn-secondary {
+            background: var(--nc-card);
+            color: var(--nc-text);
+            border: 1px solid var(--nc-border);
+        }
+        .btn-secondary:hover {
+            border-color: var(--nc-blue);
+            color: var(--nc-blue);
+        }
+        .btn svg { width: 20px; height: 20px; }
+
+        .hero-image {
+            margin-top: 3rem;
+            max-width: 900px;
+            width: 100%;
+            border-radius: var(--radius);
+            box-shadow: var(--shadow-lg);
+            border: 1px solid var(--nc-border);
+        }
+
+        /* ── SECTIONS ── */
+        section {
+            padding: 80px clamp(1rem, 5vw, 3rem);
+        }
+        .section-header {
+            text-align: center;
+            max-width: 700px;
+            margin: 0 auto 3rem;
+        }
+        .section-label {
+            font-size: 0.85rem;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.08em;
+            color: var(--nc-blue);
+            margin-bottom: 0.5rem;
+        }
+        .section-header h2 {
+            font-size: clamp(1.8rem, 4vw, 2.5rem);
+            font-weight: 800;
+            line-height: 1.2;
+            margin-bottom: 0.75rem;
+            letter-spacing: -0.01em;
+        }
+        .section-header p {
+            color: var(--nc-text-muted);
+            font-size: 1.05rem;
+        }
+
+        /* ── FEATURES GRID ── */
+        #features { background: #fff; }
+        .features-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 1.5rem;
+            max-width: 1100px;
+            margin: 0 auto;
+        }
+        .feature-card {
+            background: var(--nc-bg);
+            border-radius: var(--radius);
+            padding: 2rem;
+            transition: transform 0.2s, box-shadow 0.2s;
+            border: 1px solid transparent;
+        }
+        .feature-card:hover {
+            transform: translateY(-3px);
+            box-shadow: var(--shadow-lg);
+            border-color: var(--nc-border);
+        }
+        .feature-icon {
+            width: 48px;
+            height: 48px;
+            background: var(--nc-blue-light);
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin-bottom: 1rem;
+        }
+        .feature-icon svg {
+            width: 24px;
+            height: 24px;
+            color: var(--nc-blue);
+            stroke: var(--nc-blue);
+            fill: none;
+        }
+        .feature-card h3 {
+            font-size: 1.1rem;
+            font-weight: 700;
+            margin-bottom: 0.5rem;
+        }
+        .feature-card p {
+            color: var(--nc-text-muted);
+            font-size: 0.95rem;
+            line-height: 1.55;
+        }
+
+        /* ── SCREENSHOTS ── */
+        #screenshots { background: var(--nc-bg); }
+        .screenshots-tabs {
+            display: flex;
+            justify-content: center;
+            flex-wrap: wrap;
+            gap: 0.5rem;
+            margin-bottom: 2rem;
+            max-width: 800px;
+            margin-left: auto;
+            margin-right: auto;
+        }
+        .tab-btn {
+            padding: 10px 20px;
+            border-radius: 100px;
+            border: 1px solid var(--nc-border);
+            background: var(--nc-card);
+            color: var(--nc-text-muted);
+            font-size: 0.9rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        .tab-btn:hover { border-color: var(--nc-blue); color: var(--nc-blue); }
+        .tab-btn.active {
+            background: var(--nc-blue);
+            color: #fff;
+            border-color: var(--nc-blue);
+        }
+        .screenshot-display {
+            max-width: 950px;
+            margin: 0 auto;
+            text-align: center;
+        }
+        .screenshot-display img {
+            width: 100%;
+            border-radius: var(--radius);
+            box-shadow: var(--shadow-lg);
+            border: 1px solid var(--nc-border);
+            transition: opacity 0.3s;
+        }
+        .screenshot-caption {
+            margin-top: 1rem;
+            color: var(--nc-text-muted);
+            font-size: 0.95rem;
+        }
+
+        /* ── HOW IT WORKS ── */
+        #how-it-works { background: #fff; }
+        .steps {
+            max-width: 800px;
+            margin: 0 auto;
+            display: flex;
+            flex-direction: column;
+            gap: 0;
+            position: relative;
+        }
+        .step {
+            display: flex;
+            gap: 1.5rem;
+            align-items: flex-start;
+            position: relative;
+        }
+        .step-number {
+            width: 48px;
+            height: 48px;
+            min-width: 48px;
+            background: var(--nc-blue);
+            color: #fff;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 800;
+            font-size: 1.1rem;
+            position: relative;
+            z-index: 2;
+        }
+        .step-line {
+            position: absolute;
+            left: 23px;
+            top: 48px;
+            bottom: 0;
+            width: 2px;
+            background: var(--nc-border);
+        }
+        .step:last-child .step-line { display: none; }
+        .step-content {
+            padding-bottom: 2.5rem;
+        }
+        .step-content h3 {
+            font-size: 1.1rem;
+            font-weight: 700;
+            margin-bottom: 0.25rem;
+        }
+        .step-content p {
+            color: var(--nc-text-muted);
+            font-size: 0.95rem;
+        }
+
+        /* ── SECURITY ── */
+        #security { background: var(--nc-bg); }
+        .security-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 1rem;
+            max-width: 900px;
+            margin: 0 auto;
+        }
+        .security-item {
+            display: flex;
+            align-items: flex-start;
+            gap: 12px;
+            background: var(--nc-card);
+            padding: 1.25rem;
+            border-radius: 12px;
+            border: 1px solid var(--nc-border);
+        }
+        .security-check {
+            width: 24px;
+            height: 24px;
+            min-width: 24px;
+            background: #e6f7ed;
+            color: var(--nc-success);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin-top: 2px;
+        }
+        .security-check svg { width: 14px; height: 14px; }
+        .security-item p {
+            font-size: 0.95rem;
+            color: var(--nc-text);
+            font-weight: 500;
+        }
+
+        /* ── ACCESS TABLE ── */
+        #access { background: #fff; }
+        .access-table {
+            max-width: 800px;
+            margin: 0 auto;
+            overflow-x: auto;
+        }
+        .access-table table {
+            width: 100%;
+            border-collapse: collapse;
+            background: var(--nc-card);
+            border-radius: var(--radius);
+            overflow: hidden;
+            box-shadow: var(--shadow);
+        }
+        .access-table th, .access-table td {
+            padding: 14px 20px;
+            text-align: left;
+            font-size: 0.95rem;
+        }
+        .access-table th {
+            background: var(--nc-blue);
+            color: #fff;
+            font-weight: 600;
+        }
+        .access-table tr:nth-child(even) { background: var(--nc-bg); }
+        .access-table td:first-child { font-weight: 600; }
+
+        /* ── REQUIREMENTS ── */
+        #requirements { background: var(--nc-bg); }
+        .req-cards {
+            display: flex;
+            gap: 1.5rem;
+            justify-content: center;
+            flex-wrap: wrap;
+            max-width: 700px;
+            margin: 0 auto;
+        }
+        .req-card {
+            background: var(--nc-card);
+            border-radius: var(--radius);
+            padding: 2rem 2.5rem;
+            text-align: center;
+            box-shadow: var(--shadow);
+            border: 1px solid var(--nc-border);
+            flex: 1;
+            min-width: 200px;
+        }
+        .req-card .req-icon {
+            font-size: 2.5rem;
+            margin-bottom: 0.75rem;
+        }
+        .req-card h3 { font-weight: 700; margin-bottom: 0.25rem; }
+        .req-card p { color: var(--nc-text-muted); font-size: 0.95rem; }
+
+        /* ── INSTALL ── */
+        #install { background: #fff; }
+        .install-methods {
+            max-width: 800px;
+            margin: 0 auto;
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 1.5rem;
+        }
+        .install-card {
+            background: var(--nc-bg);
+            border-radius: var(--radius);
+            padding: 2rem;
+            border: 1px solid var(--nc-border);
+        }
+        .install-card h3 {
+            font-size: 1.1rem;
+            font-weight: 700;
+            margin-bottom: 0.75rem;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .install-card ol, .install-card ul {
+            padding-left: 1.25rem;
+            color: var(--nc-text-muted);
+            font-size: 0.95rem;
+        }
+        .install-card li { margin-bottom: 0.5rem; }
+        .install-card code {
+            display: block;
+            background: #1e1e2e;
+            color: #cdd6f4;
+            padding: 12px 16px;
+            border-radius: 8px;
+            font-size: 0.9rem;
+            margin-top: 0.75rem;
+            overflow-x: auto;
+        }
+
+        /* ── CTA ── */
+        .cta-section {
+            background: linear-gradient(135deg, var(--nc-blue), #0069a3);
+            text-align: center;
+            padding: 80px clamp(1rem, 5vw, 3rem);
+        }
+        .cta-section h2 {
+            color: #fff;
+            font-size: clamp(1.8rem, 4vw, 2.5rem);
+            font-weight: 800;
+            margin-bottom: 0.75rem;
+        }
+        .cta-section p {
+            color: rgba(255,255,255,0.8);
+            font-size: 1.1rem;
+            margin-bottom: 2rem;
+            max-width: 500px;
+            margin-left: auto;
+            margin-right: auto;
+        }
+        .cta-buttons {
+            display: flex;
+            gap: 1rem;
+            justify-content: center;
+            flex-wrap: wrap;
+        }
+        .btn-white {
+            background: #fff;
+            color: var(--nc-blue);
+        }
+        .btn-white:hover {
+            background: #f0f0f0;
+            transform: translateY(-1px);
+        }
+        .btn-outline {
+            background: transparent;
+            color: #fff;
+            border: 2px solid rgba(255,255,255,0.4);
+        }
+        .btn-outline:hover {
+            border-color: #fff;
+            background: rgba(255,255,255,0.1);
+        }
+
+        /* ── FOOTER ── */
+        footer {
+            background: #1a1a2e;
+            color: rgba(255,255,255,0.6);
+            text-align: center;
+            padding: 2rem;
+            font-size: 0.9rem;
+        }
+        footer a { color: rgba(255,255,255,0.8); text-decoration: none; }
+        footer a:hover { color: #fff; }
+        footer .footer-links {
+            display: flex;
+            justify-content: center;
+            gap: 2rem;
+            margin-bottom: 1rem;
+            flex-wrap: wrap;
+        }
+
+        /* ── RESPONSIVE ── */
+        @media (max-width: 768px) {
+            .nav-links { display: none; }
+            .nav-links.open {
+                display: flex;
+                flex-direction: column;
+                position: absolute;
+                top: 64px;
+                left: 0;
+                right: 0;
+                background: #fff;
+                padding: 1rem;
+                border-bottom: 1px solid var(--nc-border);
+                box-shadow: var(--shadow);
+            }
+            .nav-hamburger { display: block; }
+            .install-methods { grid-template-columns: 1fr; }
+            .hero { min-height: auto; padding: 120px 1rem 60px; }
+        }
+
+        /* ── ANIMATIONS ── */
+        .fade-in {
+            opacity: 0;
+            transform: translateY(20px);
+            transition: opacity 0.5s, transform 0.5s;
+        }
+        .fade-in.visible {
+            opacity: 1;
+            transform: translateY(0);
+        }
+    </style>
+</head>
+<body>
+
+<!-- NAV -->
+<nav>
+    <a href="#" class="nav-logo">
+        <svg viewBox="0 0 32 32"><rect width="32" height="32" rx="6" fill="#0082c9"/><path d="M16 6l-7 7h4.5v7h5v-7H23z" fill="#fff"/><rect x="7" y="23" width="18" height="2.5" rx="1" fill="#fff"/></svg>
+        AppDrop
+    </a>
+    <div class="nav-links" id="navLinks">
+        <a href="#features">Features</a>
+        <a href="#screenshots">Screenshots</a>
+        <a href="#how-it-works">How it works</a>
+        <a href="#security">Security</a>
+        <a href="#install">Install</a>
+        <a href="https://github.com/cdnCore-Pt/AppDrop" class="nav-cta" target="_blank">GitHub</a>
+    </div>
+    <button class="nav-hamburger" onclick="document.getElementById('navLinks').classList.toggle('open')" aria-label="Toggle menu">
+        <svg fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" d="M4 6h16M4 12h16M4 18h16"/></svg>
+    </button>
+</nav>
+
+<!-- HERO -->
+<section class="hero">
+    <div class="hero-badge">
+        <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="8" fill="#46ba61"/><path d="M5 8l2 2 4-4" stroke="#fff" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        <span>v1.3.0</span> — Nextcloud 30–32
+    </div>
+    <h1>Install apps on Nextcloud.<br><span class="highlight">No SSH required.</span></h1>
+    <p>AppDrop lets you upload, validate and install Nextcloud app packages (.zip) directly from the web UI with drag & drop, pre-install health checks and automatic backups.</p>
+    <div class="hero-buttons">
+        <a href="https://github.com/cdnCore-Pt/AppDrop/releases" class="btn btn-primary" target="_blank">
+            <svg fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" d="M12 5v14m0 0l-5-5m5 5l5-5M4 5h16"/></svg>
+            Download
+        </a>
+        <a href="https://github.com/cdnCore-Pt/AppDrop" class="btn btn-secondary" target="_blank">
+            <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor"><path d="M12 .3a12 12 0 00-3.8 23.38c.6.12.82-.26.82-.58l-.01-2.04c-3.34.73-4.04-1.61-4.04-1.61-.55-1.39-1.33-1.76-1.33-1.76-1.09-.74.08-.73.08-.73 1.2.09 1.84 1.24 1.84 1.24 1.07 1.83 2.8 1.3 3.49 1 .1-.78.42-1.3.76-1.6-2.67-.3-5.47-1.33-5.47-5.93 0-1.31.47-2.38 1.24-3.22-.13-.3-.54-1.52.12-3.18 0 0 1-.32 3.3 1.23a11.5 11.5 0 016.02 0c2.28-1.55 3.29-1.23 3.29-1.23.66 1.66.25 2.88.12 3.18.77.84 1.24 1.91 1.24 3.22 0 4.61-2.8 5.63-5.48 5.92.43.37.82 1.1.82 2.22l-.01 3.29c0 .32.22.7.83.58A12 12 0 0012 .3"/></svg>
+            View on GitHub
+        </a>
+    </div>
+    <img src="https://raw.githubusercontent.com/cdnCore-Pt/AppDrop/main/screenshots/upload.png" alt="AppDrop Upload Interface" class="hero-image fade-in">
+</section>
+
+<!-- FEATURES -->
+<section id="features">
+    <div class="section-header">
+        <div class="section-label">Features</div>
+        <h2>Everything you need to manage custom apps</h2>
+        <p>A complete toolkit for uploading, validating, installing, and managing Nextcloud applications — all from your browser.</p>
+    </div>
+    <div class="features-grid">
+        <div class="feature-card fade-in">
+            <div class="feature-icon">
+                <svg fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" d="M12 16v-8m0 0L8 12m4-4l4 4M3 16v2a2 2 0 002 2h14a2 2 0 002-2v-2"/></svg>
+            </div>
+            <h3>Drag & Drop Upload</h3>
+            <p>Upload one or multiple .zip app packages with drag & drop or the file picker. Queued files are processed sequentially for safe installation.</p>
+        </div>
+        <div class="feature-card fade-in">
+            <div class="feature-icon">
+                <svg fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"/></svg>
+            </div>
+            <h3>Pre-install Validation</h3>
+            <p>20+ health checks analyze every zip before installing: structure, security (Zip Slip), version compatibility — with actionable fix hints for every issue found.</p>
+        </div>
+        <div class="feature-card fade-in">
+            <div class="feature-icon">
+                <svg fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" d="M4 7v10c0 2.21 3.582 4 8 4s8-1.79 8-4V7M4 7c0 2.21 3.582 4 8 4s8-1.79 8-4M4 7c0-2.21 3.582-4 8-4s8 1.79 8 4m0 5c0 2.21-3.582 4-8 4s-8-1.79-8-4"/></svg>
+            </div>
+            <h3>Automatic Backups</h3>
+            <p>When updating an existing app, a timestamped backup is created automatically. Restore previous versions or delete old backups from the UI.</p>
+        </div>
+        <div class="feature-card fade-in">
+            <div class="feature-icon">
+                <svg fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" d="M4 6h16M4 12h16m-7 6h7"/></svg>
+            </div>
+            <h3>App Manager</h3>
+            <p>List all installed custom apps with their version and status. Enable, disable or remove them with a single click — no command line needed.</p>
+        </div>
+        <div class="feature-card fade-in">
+            <div class="feature-icon">
+                <svg fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" d="M19.428 15.428a2 2 0 00-1.022-.547l-2.387-.477a6 6 0 00-3.86.517l-.318.158a6 6 0 01-3.86.517L6.05 15.21a2 2 0 00-1.806.547M8 4h8l-1 1v5.172a2 2 0 00.586 1.414l5 5c1.26 1.26.367 3.414-1.415 3.414H4.828c-1.782 0-2.674-2.154-1.414-3.414l5-5A2 2 0 009 10.172V5L8 4z"/></svg>
+            </div>
+            <h3>App Skeleton Generator</h3>
+            <p>Generate a ready-to-develop Nextcloud app template with proper structure, boilerplate code, routes, controller, and placeholder icon — download as .zip.</p>
+        </div>
+        <div class="feature-card fade-in">
+            <div class="feature-icon">
+                <svg fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+            </div>
+            <h3>Upload History</h3>
+            <p>Complete log of all uploads with status, timestamps, version info and which user performed the action. Paginated view for easy browsing.</p>
+        </div>
+        <div class="feature-card fade-in">
+            <div class="feature-icon">
+                <svg fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z"/></svg>
+            </div>
+            <h3>Permission System</h3>
+            <p>Admins control who can upload apps. Grant access to individual users or entire groups with an autocomplete search interface.</p>
+        </div>
+        <div class="feature-card fade-in">
+            <div class="feature-icon">
+                <svg fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z"/></svg>
+            </div>
+            <h3>Dark & Light Theme</h3>
+            <p>Fully styled with Nextcloud CSS variables for seamless integration with both dark and light themes. Responsive on mobile and desktop.</p>
+        </div>
+    </div>
+</section>
+
+<!-- SCREENSHOTS -->
+<section id="screenshots">
+    <div class="section-header">
+        <div class="section-label">Screenshots</div>
+        <h2>See it in action</h2>
+        <p>Explore each section of AppDrop's interface.</p>
+    </div>
+    <div class="screenshots-tabs" id="screenshotTabs">
+        <button class="tab-btn active" data-img="upload" data-caption="Drag & drop upload zone — drop .zip files to start validation">Upload</button>
+        <button class="tab-btn" data-img="uploaded" data-caption="Pre-install health check with detailed validation checklist">Health Check</button>
+        <button class="tab-btn" data-img="apps" data-caption="App manager — enable, disable or remove installed custom apps">Apps</button>
+        <button class="tab-btn" data-img="generator" data-caption="App skeleton generator with live file tree preview">Generator</button>
+        <button class="tab-btn" data-img="history" data-caption="Upload history with pagination and status tracking">History</button>
+        <button class="tab-btn" data-img="backups" data-caption="Backup manager — restore or delete previous versions">Backups</button>
+        <button class="tab-btn" data-img="permissions" data-caption="Permission management — control who can upload apps">Permissions</button>
+    </div>
+    <div class="screenshot-display fade-in">
+        <img id="screenshotImg" src="https://raw.githubusercontent.com/cdnCore-Pt/AppDrop/main/screenshots/upload.png" alt="AppDrop Screenshot">
+        <p class="screenshot-caption" id="screenshotCaption">Drag & drop upload zone — drop .zip files to start validation</p>
+    </div>
+</section>
+
+<!-- HOW IT WORKS -->
+<section id="how-it-works">
+    <div class="section-header">
+        <div class="section-label">How it works</div>
+        <h2>From .zip to running app in seconds</h2>
+        <p>A streamlined installation flow that keeps your Nextcloud safe.</p>
+    </div>
+    <div class="steps">
+        <div class="step fade-in">
+            <div class="step-number">1</div>
+            <div class="step-line"></div>
+            <div class="step-content">
+                <h3>Upload</h3>
+                <p>Drag your .zip app package onto the upload zone or click to browse. Multiple files can be queued.</p>
+            </div>
+        </div>
+        <div class="step fade-in">
+            <div class="step-number">2</div>
+            <div class="step-line"></div>
+            <div class="step-content">
+                <h3>Validate</h3>
+                <p>An automatic health check runs 20+ validations: zip integrity, security scanning, version compatibility, structure analysis — showing a detailed checklist with fix hints.</p>
+            </div>
+        </div>
+        <div class="step fade-in">
+            <div class="step-number">3</div>
+            <div class="step-line"></div>
+            <div class="step-content">
+                <h3>Backup</h3>
+                <p>If the app already exists, a timestamped backup is created automatically before the update proceeds.</p>
+            </div>
+        </div>
+        <div class="step fade-in">
+            <div class="step-number">4</div>
+            <div class="step-line"></div>
+            <div class="step-content">
+                <h3>Install</h3>
+                <p>The zip is safely extracted to the apps directory. File permissions are set correctly (750 for dirs, 640 for files).</p>
+            </div>
+        </div>
+        <div class="step fade-in">
+            <div class="step-number">5</div>
+            <div class="step-content">
+                <h3>Enable</h3>
+                <p>The app is automatically enabled (if configured) and appears in your Nextcloud instance. The upload is recorded in the history log.</p>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- SECURITY -->
+<section id="security">
+    <div class="section-header">
+        <div class="section-label">Security</div>
+        <h2>Built with security in mind</h2>
+        <p>Every upload goes through multiple layers of validation before anything touches your server.</p>
+    </div>
+    <div class="security-grid">
+        <div class="security-item fade-in">
+            <div class="security-check"><svg fill="none" viewBox="0 0 24 24" stroke-width="2.5" stroke="currentColor"><path stroke-linecap="round" d="M5 13l4 4L19 7"/></svg></div>
+            <p>Zip Slip protection — rejects path traversal and absolute paths</p>
+        </div>
+        <div class="security-item fade-in">
+            <div class="security-check"><svg fill="none" viewBox="0 0 24 24" stroke-width="2.5" stroke="currentColor"><path stroke-linecap="round" d="M5 13l4 4L19 7"/></svg></div>
+            <p>MIME type validation — only accepts valid zip archives</p>
+        </div>
+        <div class="security-item fade-in">
+            <div class="security-check"><svg fill="none" viewBox="0 0 24 24" stroke-width="2.5" stroke="currentColor"><path stroke-linecap="round" d="M5 13l4 4L19 7"/></svg></div>
+            <p>Configurable file size limits to prevent abuse</p>
+        </div>
+        <div class="security-item fade-in">
+            <div class="security-check"><svg fill="none" viewBox="0 0 24 24" stroke-width="2.5" stroke="currentColor"><path stroke-linecap="round" d="M5 13l4 4L19 7"/></svg></div>
+            <p>Self-update prevention — cannot overwrite AppDrop itself</p>
+        </div>
+        <div class="security-item fade-in">
+            <div class="security-check"><svg fill="none" viewBox="0 0 24 24" stroke-width="2.5" stroke="currentColor"><path stroke-linecap="round" d="M5 13l4 4L19 7"/></svg></div>
+            <p>Permission-based access control — only authorized users can upload</p>
+        </div>
+        <div class="security-item fade-in">
+            <div class="security-check"><svg fill="none" viewBox="0 0 24 24" stroke-width="2.5" stroke="currentColor"><path stroke-linecap="round" d="M5 13l4 4L19 7"/></svg></div>
+            <p>CSRF protection via Nextcloud request tokens</p>
+        </div>
+        <div class="security-item fade-in">
+            <div class="security-check"><svg fill="none" viewBox="0 0 24 24" stroke-width="2.5" stroke="currentColor"><path stroke-linecap="round" d="M5 13l4 4L19 7"/></svg></div>
+            <p>App ID format validation — prevents injection via malformed names</p>
+        </div>
+        <div class="security-item fade-in">
+            <div class="security-check"><svg fill="none" viewBox="0 0 24 24" stroke-width="2.5" stroke="currentColor"><path stroke-linecap="round" d="M5 13l4 4L19 7"/></svg></div>
+            <p>Safe XML parsing with error handling for info.xml</p>
+        </div>
+    </div>
+</section>
+
+<!-- ACCESS TABLE -->
+<section id="access">
+    <div class="section-header">
+        <div class="section-label">Access Control</div>
+        <h2>Granular permissions per section</h2>
+        <p>Each section has its own access level to keep your instance secure.</p>
+    </div>
+    <div class="access-table fade-in">
+        <table>
+            <thead>
+                <tr><th>Section</th><th>Who can access</th><th>What it does</th></tr>
+            </thead>
+            <tbody>
+                <tr><td>Upload</td><td>Permitted users</td><td>Install or update apps from .zip packages</td></tr>
+                <tr><td>Apps</td><td>Admins only</td><td>Enable, disable or remove installed custom apps</td></tr>
+                <tr><td>History</td><td>Permitted users</td><td>View past uploads with status</td></tr>
+                <tr><td>Generator</td><td>Permitted users</td><td>Download a Nextcloud app skeleton template</td></tr>
+                <tr><td>Backups</td><td>Admins only</td><td>Restore or delete backups from previous updates</td></tr>
+                <tr><td>Permissions</td><td>Admins only</td><td>Grant or revoke upload access to users and groups</td></tr>
+            </tbody>
+        </table>
+    </div>
+</section>
+
+<!-- REQUIREMENTS -->
+<section id="requirements">
+    <div class="section-header">
+        <div class="section-label">Requirements</div>
+        <h2>Lightweight and compatible</h2>
+        <p>No extra dependencies — just Nextcloud and PHP.</p>
+    </div>
+    <div class="req-cards">
+        <div class="req-card fade-in">
+            <div class="req-icon">
+                <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="#0082c9" stroke-width="1.5"><path stroke-linecap="round" d="M5 12h14M12 5l7 7-7 7"/></svg>
+            </div>
+            <h3>Nextcloud 30–32</h3>
+            <p>Compatible with the latest stable releases</p>
+        </div>
+        <div class="req-card fade-in">
+            <div class="req-icon">
+                <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="#777BB4" stroke-width="1.5"><path stroke-linecap="round" d="M8 9l3 3-3 3m5 0h3M5 20h14a2 2 0 002-2V6a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
+            </div>
+            <h3>PHP 8.1+</h3>
+            <p>Uses modern PHP features for security and performance</p>
+        </div>
+        <div class="req-card fade-in">
+            <div class="req-icon">
+                <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="#46ba61" stroke-width="1.5"><path stroke-linecap="round" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"/></svg>
+            </div>
+            <h3>AGPL v3</h3>
+            <p>Free and open source, forever</p>
+        </div>
+    </div>
+</section>
+
+<!-- INSTALL -->
+<section id="install">
+    <div class="section-header">
+        <div class="section-label">Installation</div>
+        <h2>Get started in minutes</h2>
+        <p>Two ways to install AppDrop on your Nextcloud instance.</p>
+    </div>
+    <div class="install-methods">
+        <div class="install-card fade-in">
+            <h3>
+                <svg width="22" height="22" fill="none" viewBox="0 0 24 24" stroke="#0082c9" stroke-width="2"><path stroke-linecap="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
+                App Store
+            </h3>
+            <ol>
+                <li>Open your Nextcloud instance</li>
+                <li>Go to <strong>Apps</strong></li>
+                <li>Search for <strong>AppDrop</strong></li>
+                <li>Click <strong>Install</strong></li>
+            </ol>
+        </div>
+        <div class="install-card fade-in">
+            <h3>
+                <svg width="22" height="22" fill="none" viewBox="0 0 24 24" stroke="#0082c9" stroke-width="2"><path stroke-linecap="round" d="M8 9l3 3-3 3m5 0h3M5 20h14a2 2 0 002-2V6a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
+                Manual Install
+            </h3>
+            <ol>
+                <li>Download from <a href="https://github.com/cdnCore-Pt/AppDrop/releases" target="_blank" style="color:var(--nc-blue)">GitHub Releases</a></li>
+                <li>Extract into <strong>custom_apps/</strong></li>
+                <li>Enable via Admin Settings or CLI:</li>
+            </ol>
+            <code>php occ app:enable appdrop</code>
+        </div>
+    </div>
+</section>
+
+<!-- CTA -->
+<section class="cta-section">
+    <h2>Ready to simplify app management?</h2>
+    <p>Install AppDrop and start uploading Nextcloud apps from your browser today.</p>
+    <div class="cta-buttons">
+        <a href="https://github.com/cdnCore-Pt/AppDrop/releases" class="btn btn-white" target="_blank">
+            <svg fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" width="20" height="20"><path stroke-linecap="round" d="M12 5v14m0 0l-5-5m5 5l5-5M4 5h16"/></svg>
+            Download Latest Release
+        </a>
+        <a href="https://github.com/cdnCore-Pt/AppDrop" class="btn btn-outline" target="_blank">
+            <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor"><path d="M12 .3a12 12 0 00-3.8 23.38c.6.12.82-.26.82-.58l-.01-2.04c-3.34.73-4.04-1.61-4.04-1.61-.55-1.39-1.33-1.76-1.33-1.76-1.09-.74.08-.73.08-.73 1.2.09 1.84 1.24 1.84 1.24 1.07 1.83 2.8 1.3 3.49 1 .1-.78.42-1.3.76-1.6-2.67-.3-5.47-1.33-5.47-5.93 0-1.31.47-2.38 1.24-3.22-.13-.3-.54-1.52.12-3.18 0 0 1-.32 3.3 1.23a11.5 11.5 0 016.02 0c2.28-1.55 3.29-1.23 3.29-1.23.66 1.66.25 2.88.12 3.18.77.84 1.24 1.91 1.24 3.22 0 4.61-2.8 5.63-5.48 5.92.43.37.82 1.1.82 2.22l-.01 3.29c0 .32.22.7.83.58A12 12 0 0012 .3"/></svg>
+            Star on GitHub
+        </a>
+    </div>
+</section>
+
+<!-- FOOTER -->
+<footer>
+    <div class="footer-links">
+        <a href="https://github.com/cdnCore-Pt/AppDrop">GitHub</a>
+        <a href="https://github.com/cdnCore-Pt/AppDrop/issues">Report a Bug</a>
+        <a href="https://github.com/cdnCore-Pt/AppDrop/releases">Releases</a>
+        <a href="https://www.gnu.org/licenses/agpl-3.0">License</a>
+    </div>
+    <p>AppDrop is open source software licensed under <a href="https://www.gnu.org/licenses/agpl-3.0">AGPL v3</a>.</p>
+    <p style="margin-top: 0.5rem;">Made by Mehran Pourvahab & <a href="https://github.com/HenriqueRamos13">Henrique Rodrigues</a></p>
+</footer>
+
+<script>
+// Screenshot tabs
+document.getElementById('screenshotTabs').addEventListener('click', function(e) {
+    const btn = e.target.closest('.tab-btn');
+    if (!btn) return;
+    document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    const img = document.getElementById('screenshotImg');
+    const caption = document.getElementById('screenshotCaption');
+    img.style.opacity = '0';
+    setTimeout(() => {
+        img.src = 'https://raw.githubusercontent.com/cdnCore-Pt/AppDrop/main/screenshots/' + btn.dataset.img + '.png';
+        caption.textContent = btn.dataset.caption;
+        img.style.opacity = '1';
+    }, 150);
+});
+
+// Scroll animations
+const observer = new IntersectionObserver((entries) => {
+    entries.forEach(entry => {
+        if (entry.isIntersecting) {
+            entry.target.classList.add('visible');
+        }
+    });
+}, { threshold: 0.1 });
+
+document.querySelectorAll('.fade-in').forEach(el => observer.observe(el));
+
+// Close mobile menu on link click
+document.querySelectorAll('#navLinks a').forEach(link => {
+    link.addEventListener('click', () => {
+        document.getElementById('navLinks').classList.remove('open');
+    });
+});
+</script>
+
+</body>
+</html>
