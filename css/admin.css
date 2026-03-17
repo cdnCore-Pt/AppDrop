@@ -594,14 +594,15 @@
 }
 
 .aum-table {
-    width: 100%;
+    min-width: 100%;
+    width: max-content;
     border-collapse: collapse;
-    font-size: 0.9em;
+    font-size: 0.85em;
 }
 
 .aum-table th {
     text-align: left;
-    padding: 10px 12px;
+    padding: 8px 10px;
     font-weight: 600;
     color: var(--color-text-lighter, #666);
     border-bottom: 2px solid var(--color-border, #ddd);
@@ -609,7 +610,7 @@
 }
 
 .aum-table td {
-    padding: 10px 12px;
+    padding: 8px 10px;
     border-bottom: 1px solid var(--color-border, #eee);
     vertical-align: middle;
 }
