@@ -36,9 +36,9 @@ class AdminSectionTest extends TestCase {
 
 	public function testGetIcon(): void {
 		$this->urlGenerator->method('imagePath')
-			->with('appdrop', 'app.svg')
-			->willReturn('/apps/appdrop/img/app.svg');
+			->with('appdrop', 'app-dark.svg')
+			->willReturn('/apps/appdrop/img/app-dark.svg');
 
-		$this->assertSame('/apps/appdrop/img/app.svg', $this->section->getIcon());
+		$this->assertSame('/apps/appdrop/img/app-dark.svg', $this->section->getIcon());
 	}
 }
