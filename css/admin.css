@@ -59,7 +59,7 @@
 #app-content .aum-section {
     display: none !important;
     padding: 24px 32px;
-    max-width: 1100px;
+    max-width: 100%;
 }
 
 #app-content .aum-section.aum-section--active {
@@ -595,7 +595,7 @@
 
 .aum-table {
     min-width: 100%;
-    width: max-content;
+    width: 100%;
     border-collapse: collapse;
     font-size: 0.85em;
 }
