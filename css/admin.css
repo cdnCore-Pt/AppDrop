@@ -649,18 +649,18 @@
 }
 
 .aum-badge--success {
-    background: var(--color-success-bg, #d4edda);
-    color: var(--color-success, #1a6631);
+    background: #00a63e !important;
+    color: #fff !important;
 }
 
 .aum-badge--warning {
-    background: var(--color-warning-bg, #fff3cd);
-    color: #856404;
+    background: #d97706 !important;
+    color: #fff !important;
 }
 
 .aum-badge--error {
-    background: var(--color-error-bg, #f8d7da);
-    color: var(--color-error, #721c24);
+    background: #e5534b !important;
+    color: #fff !important;
 }
 
 /* ── Pagination ─────────────────────────────────────────────────────────── */
