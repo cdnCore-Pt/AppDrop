@@ -35,33 +35,8 @@ jobs:
         if: steps.check.outputs.exists == 'false'
         run: |
           mkdir -p build/appdrop
-          rsync -a \
-            --exclude='build' \
-            --exclude='certs' \
-            --exclude='scripts' \
-            --exclude='.git' \
-            --exclude='.github' \
-            --exclude='tests' \
-            --exclude='node_modules' \
-            --exclude='vendor' \
-            --exclude='psalm.xml' \
-            --exclude='phpunit.xml' \
-            --exclude='.php-cs-fixer.dist.php' \
-            --exclude='.php-cs-fixer.cache' \
-            --exclude='composer.lock' \
-            --exclude='composer.json' \
-            --exclude='Makefile' \
-            --exclude='krankerl.toml' \
-            --exclude='.nextcloudignore' \
-            --exclude='.gitignore' \
-            --exclude='HOW_TO_DEPLOY_TO_APPSTORE.md' \
-            --exclude='article-nextcloud-custom-app.md' \
-            --exclude='CONTRIBUTING.md' \
-            --exclude='SECURITY.md' \
-            --exclude='.phpunit.result.cache' \
-            --exclude='screenshots' \
-            --exclude='lefthook.yml' \
-            ./ build/appdrop/
+          # Single exclude source so the CI tarball matches the locally signed tree.
+          rsync -a --exclude-from=.nextcloudignore ./ build/appdrop/
           cd build && tar -czf "appdrop-${{ steps.version.outputs.version }}.tar.gz" appdrop
 
       - name: Create tag and GitHub Release

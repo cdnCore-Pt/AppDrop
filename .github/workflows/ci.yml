@@ -66,3 +66,12 @@ jobs:
 
       - name: Check code style
         run: ./vendor/bin/php-cs-fixer fix --dry-run --diff
+
+  package:
+    runs-on: ubuntu-latest
+    name: Package contract
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build & verify the App Store package
+        run: bash tests/test-package.sh

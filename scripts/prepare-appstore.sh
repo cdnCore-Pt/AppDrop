@@ -10,14 +10,16 @@
 # Usage:
 #   ./scripts/prepare-appstore.sh                  # Full flow: keygen + sign + package
 #   ./scripts/prepare-appstore.sh --keys-only      # Only generate keys + CSR
-#   ./scripts/prepare-appstore.sh --sign-only      # Only sign + package (keys must exist)
-#   ./scripts/prepare-appstore.sh --package-only    # Only build .tar.gz (already signed)
-#   ./scripts/prepare-appstore.sh --signature       # Print the release signature for API upload
+#   ./scripts/prepare-appstore.sh --sign-only      # Stage + sign + package (keys + cert must exist)
+#   ./scripts/prepare-appstore.sh --package-only   # Only stage + build .tar.gz (already signed)
+#   ./scripts/prepare-appstore.sh --signature      # Print the release signature for API upload
+#   ./scripts/prepare-appstore.sh --register-sig   # Print the one-time "Register app" signature
 #
 # Prerequisites:
-#   - openssl (for key generation and release signature)
+#   - openssl (for key generation and signatures)
 #   - Docker running with Nextcloud containers up (for occ integrity:sign-app)
-#   - The .crt certificate obtained from apps.nextcloud.com (see step 3 below)
+#   - The .crt certificate, obtained by submitting the CSR as a PR to
+#     https://github.com/nextcloud/app-certificate-requests (see HOW_TO_DEPLOY).
 #
 
 set -euo pipefail
@@ -35,8 +37,14 @@ CSR_FILE="${KEYS_DIR}/${APP_ID}.csr"
 CERT_FILE="${KEYS_DIR}/${APP_ID}.crt"
 
 BUILD_DIR="${APP_DIR}/build"
+STAGED_DIR="${BUILD_DIR}/${APP_ID}"
+IGNORE_FILE="${APP_DIR}/.nextcloudignore"
 VERSION=$(grep '<version>' "${APP_DIR}/appinfo/info.xml" | sed 's/.*<version>\(.*\)<\/version>.*/\1/' | tr -d '[:space:]')
 TARBALL="${BUILD_DIR}/${APP_ID}-${VERSION}.tar.gz"
+
+# Path of the staged tree as seen from inside the Nextcloud container
+# (assumes this app is mounted at custom_apps/${APP_ID}).
+CONTAINER_STAGED="/var/www/html/custom_apps/${APP_ID}/build/${APP_ID}"
 
 # Docker compose command (adjust if needed)
 COMPOSE_FILE="${PROJECT_ROOT}/.runtime/docker-compose.yml"
@@ -93,28 +101,49 @@ generate_keys() {
 
     echo ""
     echo "============================================================"
-    echo "  NEXT STEP: Submit this CSR to the Nextcloud App Store"
+    echo "  NEXT STEP: Submit this CSR via pull request"
     echo "============================================================"
     echo ""
-    echo "  1. Go to: https://apps.nextcloud.com/developer/apps/certificates"
-    echo "  2. Paste the following CSR content:"
+    echo "  1. Open a PR adding this file:"
+    echo "       ${APP_ID}/${APP_ID}.csr"
+    echo "     to https://github.com/nextcloud/app-certificate-requests"
+    echo "  2. CSR content to paste:"
     echo ""
     echo "------- CSR START -------"
     cat "${CSR_FILE}"
     echo "------- CSR END ---------"
     echo ""
-    echo "  3. Save the returned certificate to:"
+    echo "  3. After maintainers merge, download the issued certificate"
+    echo "     (${APP_ID}/${APP_ID}.crt in that repo) and save it to:"
     echo "     ${CERT_FILE}"
     echo ""
-    echo "  4. Then re-run this script to sign and package."
+    echo "  4. Then re-run this script with --sign-only to sign and package."
     echo "============================================================"
 }
 
-# ── Step 2: Sign the app with occ ─────────────────────────────────────────────
+# ── Step 2a: Stage the exact tree that will be shipped ────────────────────────
+# Single exclude source (.nextcloudignore) so the staged/signed/shipped/CI trees
+# are all identical. Must run before signing.
 
-sign_app() {
+stage_tree() {
+    [[ -f "${IGNORE_FILE}" ]] || die "Missing ${IGNORE_FILE} (the canonical exclude list)."
+
+    info "Staging package tree (excludes from .nextcloudignore)..."
+    rm -rf "${BUILD_DIR}"
+    mkdir -p "${STAGED_DIR}"
+    rsync -a --exclude-from="${IGNORE_FILE}" "${APP_DIR}/" "${STAGED_DIR}/"
+    ok "Staged tree at ${STAGED_DIR}"
+}
+
+# ── Step 2b: Sign the STAGED tree (not the dev tree) ──────────────────────────
+# Signing the pruned tree guarantees signature.json lists exactly the files that
+# ship. Signing the dev tree (the old behaviour) made the integrity check fail
+# with FILE_MISSING for every excluded file.
+
+sign_tree() {
     [[ -f "${PRIVATE_KEY}" ]] || die "Private key not found at ${PRIVATE_KEY}. Run with --keys-only first."
-    [[ -f "${CERT_FILE}" ]]   || die "Certificate not found at ${CERT_FILE}. Download it from apps.nextcloud.com after submitting the CSR."
+    [[ -f "${CERT_FILE}" ]]   || die "Certificate not found at ${CERT_FILE}. Get it from the app-certificate-requests PR (see HOW_TO_DEPLOY_TO_APPSTORE.md)."
+    [[ -d "${STAGED_DIR}" ]]  || die "Staged tree missing — stage_tree must run first."
 
     check_docker
 
@@ -122,60 +151,62 @@ sign_app() {
     ${COMPOSE_CMD} cp "${PRIVATE_KEY}" app:/tmp/${APP_ID}.key
     ${COMPOSE_CMD} cp "${CERT_FILE}"   app:/tmp/${APP_ID}.crt
 
-    info "Signing app with occ integrity:sign-app..."
+    info "Signing the STAGED tree with occ integrity:sign-app..."
     ${COMPOSE_CMD} exec -T -u www-data app php occ integrity:sign-app \
         --privateKey=/tmp/${APP_ID}.key \
         --certificate=/tmp/${APP_ID}.crt \
-        --path=/var/www/html/custom_apps/${APP_ID}
+        --path=${CONTAINER_STAGED}
 
     info "Cleaning up temporary files in container..."
     ${COMPOSE_CMD} exec -T app rm -f /tmp/${APP_ID}.key /tmp/${APP_ID}.crt
 
-    info "Copying signature.json back from container..."
-    ${COMPOSE_CMD} cp app:/var/www/html/custom_apps/${APP_ID}/appinfo/signature.json \
-        "${APP_DIR}/appinfo/signature.json"
+    # signature.json was written into the staged tree on the shared volume;
+    # copy it back to appinfo/ so it can be committed for the CI release path.
+    cp "${STAGED_DIR}/appinfo/signature.json" "${APP_DIR}/appinfo/signature.json"
+    ok "App signed. signature.json written to staged tree and appinfo/ (commit it)."
 
-    ok "App signed successfully. signature.json updated."
+    verify_signature_set
 }
 
-# ── Step 3: Build .tar.gz package ─────────────────────────────────────────────
+# ── Guard: signed file set must equal staged file set ─────────────────────────
 
-build_package() {
+verify_signature_set() {
+    local sig="${STAGED_DIR}/appinfo/signature.json"
+    [[ -f "${sig}" ]] || die "No signature.json in staged tree after signing."
+    if ! command -v python3 >/dev/null 2>&1; then
+        warn "python3 not found — skipping signed/shipped set verification."
+        return 0
+    fi
+    info "Verifying signed file set matches the staged tree..."
+    python3 - "${STAGED_DIR}" "${sig}" <<'PY'
+import json, os, sys
+staged, sigfile = sys.argv[1], sys.argv[2]
+hashes = set(json.load(open(sigfile))["hashes"].keys())
+present = set()
+for root, _, files in os.walk(staged):
+    for f in files:
+        present.add(os.path.relpath(os.path.join(root, f), staged))
+present.discard(os.path.join("appinfo", "signature.json"))
+missing = sorted(hashes - present)   # signed but not shipped -> FILE_MISSING
+extra   = sorted(present - hashes)   # shipped but not signed -> EXTRA_FILE
+if missing or extra:
+    for m in missing:
+        print("  signed-but-absent:", m)
+    for e in extra:
+        print("  shipped-but-unsigned:", e)
+    sys.exit(1)
+print(f"  OK: {len(hashes)} files signed == shipped")
+PY
+    ok "Signature set matches the staged tree."
+}
+
+# ── Step 3: Build .tar.gz from the staged tree ────────────────────────────────
+
+make_tarball() {
+    [[ -d "${STAGED_DIR}" ]] || die "Staged tree missing — stage_tree must run first."
+
     info "Building release package v${VERSION}..."
-
-    rm -rf "${BUILD_DIR}"
-    mkdir -p "${BUILD_DIR}/${APP_ID}"
-
-    rsync -a \
-        --exclude='build' \
-        --exclude='certs' \
-        --exclude='scripts' \
-        --exclude='.git' \
-        --exclude='.github' \
-        --exclude='tests' \
-        --exclude='node_modules' \
-        --exclude='vendor' \
-        --exclude='psalm.xml' \
-        --exclude='phpunit.xml' \
-        --exclude='.php-cs-fixer.dist.php' \
-        --exclude='.php-cs-fixer.cache' \
-        --exclude='composer.lock' \
-        --exclude='composer.json' \
-        --exclude='Makefile' \
-        --exclude='krankerl.toml' \
-        --exclude='.nextcloudignore' \
-        --exclude='.gitignore' \
-        --exclude='HOW_TO_DEPLOY_TO_APPSTORE.md' \
-        --exclude='article-nextcloud-custom-app.md' \
-        --exclude='CONTRIBUTING.md' \
-        --exclude='SECURITY.md' \
-        --exclude='.phpunit.result.cache' \
-        --exclude='screenshots' \
-        "${APP_DIR}/" "${BUILD_DIR}/${APP_ID}/"
-
-    cd "${BUILD_DIR}"
-    tar -czf "${APP_ID}-${VERSION}.tar.gz" "${APP_ID}"
-    rm -rf "${BUILD_DIR}/${APP_ID}"
+    ( cd "${BUILD_DIR}" && tar -czf "${APP_ID}-${VERSION}.tar.gz" "${APP_ID}" )
 
     ok "Package created: ${TARBALL}"
     echo "    Size: $(du -h "${TARBALL}" | cut -f1)"
@@ -211,6 +242,28 @@ print_signature() {
     echo ""
 }
 
+# ── Registration signature (sign over the app id, for "Register app") ─────────
+
+print_register_signature() {
+    [[ -f "${PRIVATE_KEY}" ]] || die "Private key not found at ${PRIVATE_KEY}."
+    check_openssl
+
+    local sig
+    sig=$(echo -n "${APP_ID}" | openssl dgst -sha512 -sign "${PRIVATE_KEY}" | openssl base64 -A)
+
+    echo "============================================================"
+    echo "  Registration signature (one-time, for 'Register app')"
+    echo "============================================================"
+    echo ""
+    echo "${sig}"
+    echo ""
+    echo "  Register at https://apps.nextcloud.com/developer/apps/new"
+    echo "  Paste the contents of ${CERT_FILE} as the certificate, and the"
+    echo "  signature above as the signature over the app id. Do this once,"
+    echo "  before uploading any release."
+    echo "============================================================"
+}
+
 # ── Main ──────────────────────────────────────────────────────────────────────
 
 main() {
@@ -226,14 +279,19 @@ main() {
             generate_keys
             ;;
         --sign-only)
-            sign_app
-            build_package
+            stage_tree
+            sign_tree
+            make_tarball
             ;;
         --package-only)
-            build_package
+            stage_tree
+            make_tarball
             ;;
         --signature)
             print_signature
+            ;;
+        --register-sig)
+            print_register_signature
             ;;
         *)
             # Full flow
@@ -241,21 +299,24 @@ main() {
                 generate_keys
                 echo ""
                 warn "Certificate (.crt) is needed before signing."
-                warn "After saving the certificate to ${CERT_FILE}, re-run:"
+                warn "After the app-certificate-requests PR is merged and you save"
+                warn "the certificate to ${CERT_FILE}, re-run:"
                 warn "  ./scripts/prepare-appstore.sh --sign-only"
                 exit 0
             fi
 
             if [[ ! -f "${CERT_FILE}" ]]; then
                 warn "Certificate not found at ${CERT_FILE}"
-                warn "Submit the CSR to https://apps.nextcloud.com/developer/apps/certificates"
-                warn "Save the returned certificate to ${CERT_FILE}"
+                warn "Submit ${CSR_FILE} as a PR to:"
+                warn "  https://github.com/nextcloud/app-certificate-requests"
+                warn "Save the issued certificate to ${CERT_FILE}"
                 warn "Then re-run: ./scripts/prepare-appstore.sh --sign-only"
                 exit 0
             fi
 
-            sign_app
-            build_package
+            stage_tree
+            sign_tree
+            make_tarball
             print_signature
 
             echo ""

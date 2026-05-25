@@ -31,11 +31,17 @@ The script will:
 - Generate a CSR at `certs/appdrop.csr`
 - Print the CSR content for you to copy
 
-Then:
-1. Go to https://apps.nextcloud.com/developer/apps/certificates
-2. Paste the CSR content
-3. Copy the returned certificate
-4. Save it to `certs/appdrop.crt`
+Then get the certificate **via pull request** (there is no web form):
+1. Open a PR adding `appdrop/appdrop.csr` to
+   https://github.com/nextcloud/app-certificate-requests
+   (the path must be `APP_ID/APP_ID.csr`, i.e. `appdrop/appdrop.csr`)
+2. Paste the CSR content; optionally link the app source in the PR description
+3. Wait for a maintainer to merge (manual review — they verify you own the app id)
+4. After merge, download the issued `appdrop/appdrop.crt` from that repo and save it to `certs/appdrop.crt`:
+   ```bash
+   curl -sL -o certs/appdrop.crt \
+     https://raw.githubusercontent.com/nextcloud/app-certificate-requests/master/appdrop/appdrop.crt
+   ```
 
 ### Sign & package
 
@@ -45,10 +51,28 @@ Then:
 ```
 
 This will:
-- Copy key + cert into the container
-- Run `occ integrity:sign-app` to generate `appinfo/signature.json`
+- Stage the shipped tree from `.nextcloudignore` into `build/appdrop`
+- Run `occ integrity:sign-app` on the **staged** tree to generate `appinfo/signature.json`
+- Verify the signed file set equals the shipped file set
 - Build `build/appdrop-<version>.tar.gz`
-- Print the release signature for API upload
+
+(The release signature for API upload is printed separately by `--signature`, step 4 below.)
+
+### Register the app (first time only)
+
+Before your **first** release you must register the app id on the store (binds
+`appdrop` to your certificate). This is required once, after the certificate is issued:
+
+```bash
+# Print the signature over the app id
+./scripts/prepare-appstore.sh --register-sig
+```
+
+Then register — the web form is easiest (the certificate contains newlines):
+- **Web:** https://apps.nextcloud.com/developer/apps/new — paste the contents of
+  `certs/appdrop.crt` and the signature printed above.
+- **API:** `POST https://apps.nextcloud.com/api/v1/apps` with a JSON body
+  `{"certificate": "<certs/appdrop.crt>", "signature": "<register-sig>"}`.
 
 ### Upload to App Store
 
@@ -93,11 +117,12 @@ For each new version:
 
 | Command | Description |
 |---|---|
-| `./scripts/prepare-appstore.sh` | Full flow (keygen if needed → sign → package → signature) |
+| `./scripts/prepare-appstore.sh` | Full flow (keygen if needed → stage → sign → package → signature) |
 | `./scripts/prepare-appstore.sh --keys-only` | Only generate private key + CSR |
-| `./scripts/prepare-appstore.sh --sign-only` | Sign app + build .tar.gz (key + cert must exist) |
-| `./scripts/prepare-appstore.sh --package-only` | Only build .tar.gz (app already signed) |
+| `./scripts/prepare-appstore.sh --sign-only` | Stage + sign the staged tree + build .tar.gz (key + cert must exist) |
+| `./scripts/prepare-appstore.sh --package-only` | Stage + build .tar.gz (app already signed) |
 | `./scripts/prepare-appstore.sh --signature` | Print the release signature for API upload |
+| `./scripts/prepare-appstore.sh --register-sig` | Print the one-time "Register app" signature |
 
 ---
 
@@ -119,81 +144,60 @@ openssl req -new \
   -subj "/CN=appdrop"
 ```
 
-### Step 2: Get certificate from Nextcloud
+### Step 2: Get certificate (pull request)
 
-1. Go to https://apps.nextcloud.com/developer/apps/certificates
-2. Paste the content of `certs/appdrop.csr`
-3. Save the returned certificate to `certs/appdrop.crt`
+1. Open a PR adding `appdrop/appdrop.csr` (path `APP_ID/APP_ID.csr`) to
+   https://github.com/nextcloud/app-certificate-requests
+2. Paste the content of `certs/appdrop.csr`; optionally link the app source
+3. Wait for a maintainer to merge (manual review of ownership)
+4. After merge, save the issued certificate to `certs/appdrop.crt`:
+   ```bash
+   curl -sL -o certs/appdrop.crt \
+     https://raw.githubusercontent.com/nextcloud/app-certificate-requests/master/appdrop/appdrop.crt
+   ```
 
-### Step 3: Sign the app
+### Step 3: Stage the package tree
 
-The signing must happen inside the Nextcloud container where `occ` is available.
+Stage exactly what will ship, using the single exclude list (`.nextcloudignore`).
+You sign and ship the **same** tree, so the integrity check cannot fail later.
 
 ```bash
-# Copy key and cert into the container
-docker compose -f .runtime/docker-compose.yml -p nextcloud \
-  cp certs/appdrop.key app:/tmp/appdrop.key
-docker compose -f .runtime/docker-compose.yml -p nextcloud \
-  cp certs/appdrop.crt app:/tmp/appdrop.crt
+cd custom_apps/appdrop
+mkdir -p build/appdrop
+rsync -a --exclude-from=.nextcloudignore ./ build/appdrop/
+```
 
-# Sign the app
+### Step 4: Sign the staged tree
+
+Signing happens inside the Nextcloud container where `occ` is available, and must
+point at the **staged** tree (`build/appdrop`), not the source. Signing the source
+makes `signature.json` list files that aren't shipped → `FILE_MISSING` at install.
+
+```bash
+docker compose -f .runtime/docker-compose.yml -p nextcloud cp certs/appdrop.key app:/tmp/appdrop.key
+docker compose -f .runtime/docker-compose.yml -p nextcloud cp certs/appdrop.crt app:/tmp/appdrop.crt
+
 docker compose -f .runtime/docker-compose.yml -p nextcloud \
   exec -T -u www-data app php occ integrity:sign-app \
     --privateKey=/tmp/appdrop.key \
     --certificate=/tmp/appdrop.crt \
-    --path=/var/www/html/custom_apps/appdrop
+    --path=/var/www/html/custom_apps/appdrop/build/appdrop
 
-# Clean up keys from container
-docker compose -f .runtime/docker-compose.yml -p nextcloud \
-  exec -T app rm -f /tmp/appdrop.key /tmp/appdrop.crt
+docker compose -f .runtime/docker-compose.yml -p nextcloud exec -T app rm -f /tmp/appdrop.key /tmp/appdrop.crt
 
-# Copy signature.json back to local
-docker compose -f .runtime/docker-compose.yml -p nextcloud \
-  cp app:/var/www/html/custom_apps/appdrop/appinfo/signature.json \
-  custom_apps/appdrop/appinfo/signature.json
+# signature.json is on the shared volume; copy it back to appinfo/ so it can be committed
+cp build/appdrop/appinfo/signature.json appinfo/signature.json
 ```
 
-### Step 4: Build the tarball
+### Step 5: Build the tarball
 
-The App Store requires `.tar.gz` format. The tarball must contain a single top-level directory matching the app ID.
+The App Store requires `.tar.gz` with a single top-level directory matching the app id.
 
 ```bash
-cd custom_apps
-
-mkdir -p appdrop/build/appdrop
-
-rsync -a \
-  --exclude='build' \
-  --exclude='certs' \
-  --exclude='scripts' \
-  --exclude='.git' \
-  --exclude='.github' \
-  --exclude='tests' \
-  --exclude='node_modules' \
-  --exclude='vendor' \
-  --exclude='psalm.xml' \
-  --exclude='phpunit.xml' \
-  --exclude='.php-cs-fixer.dist.php' \
-  --exclude='.php-cs-fixer.cache' \
-  --exclude='composer.lock' \
-  --exclude='composer.json' \
-  --exclude='Makefile' \
-  --exclude='krankerl.toml' \
-  --exclude='.nextcloudignore' \
-  --exclude='.gitignore' \
-  --exclude='HOW_TO_DEPLOY_TO_APPSTORE.md' \
-  --exclude='article-nextcloud-custom-app.md' \
-  --exclude='CONTRIBUTING.md' \
-  --exclude='SECURITY.md' \
-  --exclude='.phpunit.result.cache' \
-  --exclude='screenshots' \
-  appdrop/ appdrop/build/appdrop/
-
-cd appdrop/build
+cd build
 tar -czf appdrop-1.2.0.tar.gz appdrop
-rm -rf appdrop/
 
-# Verify the tarball structure
+# Verify the tarball structure (signature.json must be present)
 tar tzf appdrop-1.2.0.tar.gz | head -15
 ```
 
@@ -207,7 +211,7 @@ appdrop/appinfo/signature.json
 ...
 ```
 
-### Step 5: Create GitHub release
+### Step 6: Create GitHub release
 
 ```bash
 git tag v1.2.0
@@ -224,7 +228,7 @@ The download URL will be:
 https://github.com/cdnCore-Pt/AppDrop/releases/download/v1.2.0/appdrop-1.2.0.tar.gz
 ```
 
-### Step 6: Generate release signature
+### Step 7: Generate release signature
 
 ```bash
 openssl dgst -sha512 \
@@ -234,7 +238,21 @@ openssl dgst -sha512 \
 
 Copy the output — this is your release signature.
 
-### Step 7: Submit to App Store
+### Step 8: Register the app (first time only)
+
+Register the app id once, before your first release (binds `appdrop` to your cert):
+
+```bash
+./scripts/prepare-appstore.sh --register-sig
+```
+
+Then register at https://apps.nextcloud.com/developer/apps/new (paste the contents
+of `certs/appdrop.crt` plus the signature above), or `POST /api/v1/apps` with a JSON
+body `{"certificate": "<certs/appdrop.crt>", "signature": "<register-sig>"}`.
+
+### Step 9: Submit the release
+
+> First release only: complete Step 8 first, or the upload is rejected (app not registered).
 
 **Option A: API (recommended)**
 
@@ -258,7 +276,7 @@ curl -X POST https://apps.nextcloud.com/api/v1/apps/releases \
 3. Paste the release signature
 4. Submit
 
-### Step 8: Add screenshots (recommended)
+### Step 10: Add screenshots (recommended)
 
 Before or after publishing, add screenshots to improve visibility:
 
@@ -281,8 +299,8 @@ After setup, the signing-related files live in:
 ```
 certs/                          ← git-ignored, NEVER commit
 ├── appdrop.key    ← Private key (keep safe!)
-├── appdrop.csr    ← CSR (submitted to Nextcloud)
-└── appdrop.crt    ← Certificate (from Nextcloud)
+├── appdrop.csr    ← CSR (submitted via app-certificate-requests PR)
+└── appdrop.crt    ← Certificate (issued in that PR after merge)
 
 build/                          ← git-ignored
 └── appdrop-1.2.0.tar.gz   ← Release tarball

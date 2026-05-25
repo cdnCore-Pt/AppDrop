@@ -1,18 +1,29 @@
+# Single source of truth for files EXCLUDED from the App Store package.
+# Consumed via `rsync --exclude-from` by scripts/prepare-appstore.sh and
+# .github/workflows/release.yml. The signed tree must equal the shipped tree,
+# so this is the only exclude list — keep all packaging paths reading from here.
 .git
 .github
+.gitignore
+.nextcloudignore
 tests
 certs
 scripts
+build
+node_modules
+vendor
+screenshots
 psalm.xml
 phpunit.xml
+.phpunit.result.cache
 .php-cs-fixer.dist.php
 .php-cs-fixer.cache
-composer.lock
 composer.json
-CHANGELOG.md
-README.md
-HOW_TO_DEPLOY_TO_APPSTORE.md
+composer.lock
 Makefile
 krankerl.toml
-.nextcloudignore
-.gitignore
+lefthook.yml
+HOW_TO_DEPLOY_TO_APPSTORE.md
+article-nextcloud-custom-app.md
+CONTRIBUTING.md
+SECURITY.md

@@ -15,20 +15,16 @@ lint:
 psalm:
 	cd $(CURDIR) && php vendor/psalm/phar/psalm.phar --no-cache
 
-package: clean
-	mkdir -p $(build_dir)/$(app_name)
-	rsync -a --exclude=build --exclude=.git --exclude=.github --exclude=tests \
-		--exclude=psalm.xml --exclude=phpunit.xml --exclude=.php-cs-fixer.dist.php \
-		--exclude=.php-cs-fixer.cache --exclude=composer.lock --exclude=CHANGELOG.md \
-		--exclude=README.md --exclude=Makefile --exclude=krankerl.toml \
-		--exclude=.nextcloudignore --exclude=.gitignore \
-		$(CURDIR)/ $(build_dir)/$(app_name)/
-	cd $(build_dir) && tar -czf $(app_name).tar.gz $(app_name)
+# Packaging and signing live in one place (scripts/prepare-appstore.sh), which
+# reads the canonical exclude list from .nextcloudignore. Don't reintroduce a
+# second exclude list here — the signed tree must equal the shipped tree.
+package:
+	./scripts/prepare-appstore.sh --package-only
 
-sign: package
-	docker exec -u www-data nextcloud-app-1 php occ integrity:sign-app \
-		--path=/var/www/html/custom_apps/$(app_name) \
-		--privateKey=/path/to/$(app_name).key \
-		--certificate=/path/to/$(app_name).crt
+sign:
+	./scripts/prepare-appstore.sh --sign-only
 
-.PHONY: all clean test lint psalm package sign
+package-test:
+	./tests/test-package.sh
+
+.PHONY: all clean test lint psalm package sign package-test
