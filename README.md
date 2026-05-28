@@ -4,8 +4,11 @@
 [![License: AGPL v3](https://img.shields.io/badge/License-AGPL_v3-blue.svg)](https://www.gnu.org/licenses/agpl-3.0)
 [![Nextcloud: 30-32](https://img.shields.io/badge/Nextcloud-30--32-0082c9.svg)](https://apps.nextcloud.com/apps/appdrop)
 [![PHP: 8.1+](https://img.shields.io/badge/PHP-8.1%2B-777BB4.svg)](https://www.php.net/)
+[![Built by cdnCore](https://img.shields.io/badge/Built_by-cdnCore-1f2937.svg)](https://cdncore.eu/)
 
 Upload, validate and install custom Nextcloud app packages (.zip) directly from the web UI — no SSH required.
+
+> Built and maintained by **[cdnCore](https://cdncore.eu/)** — applied informatics and AI for modern enterprises.
 
 ![AppDrop Upload UI](screenshots/upload.png)
 
