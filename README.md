@@ -73,6 +73,15 @@ In **Administration Settings > AppDrop** you can configure:
 - **Max upload size** (default: 20 MB)
 - **Auto-enable apps** after installation
 
+## About cdnCore
+
+AppDrop is built and maintained by **[cdnCore](https://cdncore.eu/)** — an applied
+informatics and AI company focused on agentic intelligence, cybersecurity,
+enterprise AI automation, robotics, and big data analytics.
+
+For custom Nextcloud development, enterprise AI integrations, or cybersecurity
+engagements, get in touch at [cdncore.eu](https://cdncore.eu/).
+
 ## License
 
 AGPL-3.0-or-later
