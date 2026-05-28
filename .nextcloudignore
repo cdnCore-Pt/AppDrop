@@ -10,6 +10,7 @@ tests
 certs
 scripts
 build
+.runtime
 node_modules
 vendor
 screenshots

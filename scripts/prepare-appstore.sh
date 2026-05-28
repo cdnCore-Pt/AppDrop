@@ -42,12 +42,17 @@ IGNORE_FILE="${APP_DIR}/.nextcloudignore"
 VERSION=$(grep '<version>' "${APP_DIR}/appinfo/info.xml" | sed 's/.*<version>\(.*\)<\/version>.*/\1/' | tr -d '[:space:]')
 TARBALL="${BUILD_DIR}/${APP_ID}-${VERSION}.tar.gz"
 
-# Path of the staged tree as seen from inside the Nextcloud container
-# (assumes this app is mounted at custom_apps/${APP_ID}).
-CONTAINER_STAGED="/var/www/html/custom_apps/${APP_ID}/build/${APP_ID}"
+# Path inside the container where the staged tree is copied for signing.
+# Kept independent of any bind mount so this works on a plain Nextcloud image.
+CONTAINER_STAGED="/tmp/${APP_ID}-staged"
 
-# Docker compose command (adjust if needed)
-COMPOSE_FILE="${PROJECT_ROOT}/.runtime/docker-compose.yml"
+# Docker compose: prefer the repo-local .runtime/ (standalone checkout), fall back
+# to a parent project's .runtime/ when the app sits inside a wider NC dev tree.
+if [[ -f "${APP_DIR}/.runtime/docker-compose.yml" ]]; then
+    COMPOSE_FILE="${APP_DIR}/.runtime/docker-compose.yml"
+else
+    COMPOSE_FILE="${PROJECT_ROOT}/.runtime/docker-compose.yml"
+fi
 COMPOSE_CMD="docker compose -f ${COMPOSE_FILE} -p nextcloud"
 
 # Colors
@@ -147,9 +152,16 @@ sign_tree() {
 
     check_docker
 
-    info "Copying key and certificate into container..."
-    ${COMPOSE_CMD} cp "${PRIVATE_KEY}" app:/tmp/${APP_ID}.key
-    ${COMPOSE_CMD} cp "${CERT_FILE}"   app:/tmp/${APP_ID}.crt
+    info "Copying staged tree, key and certificate into container..."
+    ${COMPOSE_CMD} exec -T app rm -rf "${CONTAINER_STAGED}"
+    ${COMPOSE_CMD} cp "${STAGED_DIR}"  "app:${CONTAINER_STAGED}"
+    ${COMPOSE_CMD} cp "${PRIVATE_KEY}" "app:/tmp/${APP_ID}.key"
+    ${COMPOSE_CMD} cp "${CERT_FILE}"   "app:/tmp/${APP_ID}.crt"
+
+    # Files copied from the host land as the host uid; occ runs as www-data and
+    # needs to read the key/cert and write signature.json into the staged tree.
+    ${COMPOSE_CMD} exec -T app chown -R www-data:www-data "${CONTAINER_STAGED}"
+    ${COMPOSE_CMD} exec -T app chmod 644 "/tmp/${APP_ID}.key" "/tmp/${APP_ID}.crt"
 
     info "Signing the STAGED tree with occ integrity:sign-app..."
     ${COMPOSE_CMD} exec -T -u www-data app php occ integrity:sign-app \
@@ -157,14 +169,15 @@ sign_tree() {
         --certificate=/tmp/${APP_ID}.crt \
         --path=${CONTAINER_STAGED}
 
-    info "Cleaning up temporary files in container..."
-    ${COMPOSE_CMD} exec -T app rm -f /tmp/${APP_ID}.key /tmp/${APP_ID}.crt
-
-    # signature.json was written into the staged tree on the shared volume;
-    # copy it back to appinfo/ so it can be committed for the CI release path.
+    info "Copying signature.json back from container..."
+    ${COMPOSE_CMD} cp "app:${CONTAINER_STAGED}/appinfo/signature.json" \
+        "${STAGED_DIR}/appinfo/signature.json"
     cp "${STAGED_DIR}/appinfo/signature.json" "${APP_DIR}/appinfo/signature.json"
-    ok "App signed. signature.json written to staged tree and appinfo/ (commit it)."
 
+    info "Cleaning up container..."
+    ${COMPOSE_CMD} exec -T app rm -rf "${CONTAINER_STAGED}" "/tmp/${APP_ID}.key" "/tmp/${APP_ID}.crt"
+
+    ok "App signed. signature.json written to staged tree and appinfo/ (commit it)."
     verify_signature_set
 }
 
