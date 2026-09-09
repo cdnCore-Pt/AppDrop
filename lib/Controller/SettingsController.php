@@ -11,6 +11,7 @@ namespace OCA\AppDrop\Controller;
 
 use OCA\AppDrop\Service\PermissionService;
 use OCP\AppFramework\Controller;
+use OCP\AppFramework\Http\Attribute\NoCSRFRequired;
 use OCP\AppFramework\Http\JSONResponse;
 use OCP\IConfig;
 use OCP\IGroupManager;
@@ -38,9 +39,8 @@ class SettingsController extends Controller {
 
 	/**
 	 * Get current settings.
-	 *
-	 * @NoCSRFRequired
 	 */
+	#[NoCSRFRequired]
 	public function get(): JSONResponse {
 		$denied = $this->denyIfNotAdmin();
 		if ($denied !== null) {

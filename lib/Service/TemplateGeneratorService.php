@@ -9,14 +9,19 @@ declare(strict_types=1);
 
 namespace OCA\AppDrop\Service;
 
+use OCP\IConfig;
 use OCP\ITempManager;
 
 /**
  * Generates a Nextcloud app skeleton as a .zip download.
  */
 class TemplateGeneratorService {
+	/** Oldest Nextcloud major the generated skeleton claims to support. */
+	private const MIN_NC_VERSION = 30;
+
 	public function __construct(
 		private readonly ITempManager $tempManager,
+		private readonly IConfig $config,
 	) {
 	}
 
@@ -50,6 +55,9 @@ class TemplateGeneratorService {
 		}
 
 		$year = date('Y');
+		// The skeleton must be installable on the server that generated it, so
+		// max-version follows the running major instead of a hard-coded number.
+		$maxNc = max(self::MIN_NC_VERSION, (int)explode('.', $this->config->getSystemValueString('version', ''))[0]);
 		$authorXml = $author !== '' ? $author : 'Your Name';
 		$descriptionXml = $description !== '' ? htmlspecialchars($description, ENT_XML1) : 'A custom Nextcloud app.';
 
@@ -68,7 +76,7 @@ class TemplateGeneratorService {
     <namespace>%6$s</namespace>
     <category>tools</category>
     <dependencies>
-        <nextcloud min-version="30" max-version="32"/>
+        <nextcloud min-version="%7$d" max-version="%8$d"/>
         <php min-version="8.1"/>
     </dependencies>
     <navigations>
@@ -86,6 +94,8 @@ class TemplateGeneratorService {
 			htmlspecialchars($version, ENT_XML1),
 			htmlspecialchars($authorXml, ENT_XML1),
 			htmlspecialchars($namespace, ENT_XML1),
+			self::MIN_NC_VERSION,
+			$maxNc,
 		));
 
 		// appinfo/routes.php
@@ -146,6 +156,8 @@ declare(strict_types=1);
 namespace OCA\%1$s\Controller;
 
 use OCP\AppFramework\Controller;
+use OCP\AppFramework\Http\Attribute\NoAdminRequired;
+use OCP\AppFramework\Http\Attribute\NoCSRFRequired;
 use OCP\AppFramework\Http\TemplateResponse;
 use OCP\IRequest;
 
@@ -156,10 +168,8 @@ class PageController extends Controller
         parent::__construct($appName, $request);
     }
 
-    /**
-     * @NoCSRFRequired
-     * @NoAdminRequired
-     */
+    #[NoAdminRequired]
+    #[NoCSRFRequired]
     public function index(): TemplateResponse
     {
         return new TemplateResponse(\'%2$s\', \'main\');

@@ -12,6 +12,7 @@ namespace OCA\AppDrop\Controller;
 use OCA\AppDrop\Service\HealthCheckService;
 use OCA\AppDrop\Service\PermissionService;
 use OCP\AppFramework\Controller;
+use OCP\AppFramework\Http\Attribute\NoAdminRequired;
 use OCP\AppFramework\Http\JSONResponse;
 use OCP\IGroupManager;
 use OCP\IRequest;
@@ -35,9 +36,8 @@ class HealthCheckController extends Controller {
 
 	/**
 	 * Validate a zip file before installation.
-	 *
-	 * @NoAdminRequired
 	 */
+	#[NoAdminRequired]
 	public function validate(): JSONResponse {
 		$denied = $this->denyIfCannotUpload();
 		if ($denied !== null) {

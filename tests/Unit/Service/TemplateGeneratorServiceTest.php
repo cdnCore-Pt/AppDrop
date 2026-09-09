@@ -6,18 +6,22 @@ namespace OCA\AppDrop\Tests\Unit\Service;
 
 use OCA\AppDrop\Service\AppInstallException;
 use OCA\AppDrop\Service\TemplateGeneratorService;
+use OCP\IConfig;
 use OCP\ITempManager;
 use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
 
 class TemplateGeneratorServiceTest extends TestCase {
 	private ITempManager&MockObject $tempManager;
+	private IConfig&MockObject $config;
 	private TemplateGeneratorService $service;
 	private string $tmpDir;
 
 	protected function setUp(): void {
 		$this->tempManager = $this->createMock(ITempManager::class);
-		$this->service = new TemplateGeneratorService($this->tempManager);
+		$this->config = $this->createMock(IConfig::class);
+		$this->config->method('getSystemValueString')->with('version', '')->willReturn('33.0.8.2');
+		$this->service = new TemplateGeneratorService($this->tempManager, $this->config);
 		$this->tmpDir = sys_get_temp_dir() . '/appdrop_gen_' . uniqid();
 		mkdir($this->tmpDir, 0755, true);
 	}
@@ -121,5 +125,57 @@ class TemplateGeneratorServiceTest extends TestCase {
 		$this->assertStringContainsString('My &lt;App&gt;', $infoXml);
 		// ENT_XML1 escapes <, >, & but not quotes
 		$this->assertStringContainsString('A "cool" &amp; useful app', $infoXml);
+	}
+
+	public function testGenerateInfoXmlMaxVersionFollowsRunningServer(): void {
+		$tmpPath = $this->tmpDir . '/skeleton.zip';
+		$this->tempManager->method('getTemporaryFile')->willReturn($tmpPath);
+
+		$this->service->generate('my_app', 'My App', 'MyApp');
+
+		$zip = new \ZipArchive();
+		$zip->open($tmpPath);
+		$infoXml = $zip->getFromName('my_app/appinfo/info.xml');
+		$zip->close();
+
+		// Server is 33.0.8.2 (see setUp): a skeleton generated here must be installable here.
+		$this->assertStringContainsString('<nextcloud min-version="30" max-version="33"/>', $infoXml);
+	}
+
+	public function testGenerateInfoXmlMaxVersionOnOlderServer(): void {
+		$config = $this->createMock(IConfig::class);
+		$config->method('getSystemValueString')->with('version', '')->willReturn('31.0.2.1');
+		$service = new TemplateGeneratorService($this->tempManager, $config);
+
+		$tmpPath = $this->tmpDir . '/skeleton.zip';
+		$this->tempManager->method('getTemporaryFile')->willReturn($tmpPath);
+
+		$service->generate('my_app', 'My App', 'MyApp');
+
+		$zip = new \ZipArchive();
+		$zip->open($tmpPath);
+		$infoXml = $zip->getFromName('my_app/appinfo/info.xml');
+		$zip->close();
+
+		$this->assertStringContainsString('<nextcloud min-version="30" max-version="31"/>', $infoXml);
+	}
+
+	public function testGeneratedControllerUsesPhpAttributesNotAnnotations(): void {
+		$tmpPath = $this->tmpDir . '/skeleton.zip';
+		$this->tempManager->method('getTemporaryFile')->willReturn($tmpPath);
+
+		$this->service->generate('my_app', 'My App', 'MyApp');
+
+		$zip = new \ZipArchive();
+		$zip->open($tmpPath);
+		$controller = $zip->getFromName('my_app/lib/Controller/PageController.php');
+		$zip->close();
+
+		$this->assertStringContainsString('use OCP\\AppFramework\\Http\\Attribute\\NoAdminRequired;', $controller);
+		$this->assertStringContainsString('use OCP\\AppFramework\\Http\\Attribute\\NoCSRFRequired;', $controller);
+		$this->assertStringContainsString('#[NoAdminRequired]', $controller);
+		$this->assertStringContainsString('#[NoCSRFRequired]', $controller);
+		$this->assertStringNotContainsString('@NoAdminRequired', $controller);
+		$this->assertStringNotContainsString('@NoCSRFRequired', $controller);
 	}
 }

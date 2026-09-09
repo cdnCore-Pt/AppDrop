@@ -20,6 +20,7 @@ class BackupService {
 
 	public function __construct(
 		private readonly AppPathResolver $pathResolver,
+		private readonly AppUpgradeService $upgrader,
 		private readonly LoggerInterface $logger,
 	) {
 	}
@@ -93,6 +94,9 @@ class BackupService {
 		}
 
 		$this->logger->info("[AppDrop] Restored backup '{$dirName}' to '{$appPath}'.");
+
+		// The restored code is (usually) an older version than the DB records.
+		$this->upgrader->reconcile($appId, $appPath);
 	}
 
 	/**

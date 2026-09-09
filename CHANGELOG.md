@@ -5,6 +5,22 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.4.0] - 2026-09-09
+
+### Added
+- Nextcloud 33 support (`max-version="33"`); verified end-to-end on 33.0.8 and 30.0.17
+
+### Fixed
+- Updating an app (or restoring a backup / re-installing after a remove) left `installed_version` behind, so Nextcloud answered 503 "upgrade needed" to every request until `occ upgrade` was run manually. AppDrop now runs the app's upgrade routine itself (`IAppManager::upgradeApp()` on NC 32+, `OC_App::updateApp()` on NC 30/31)
+- `AppInstallException` moved to its own file: it was only autoloadable after `AppInstallService` had been loaded, which turned errors in the Backups/Apps tabs into a fatal "Class not found"
+- Generated app skeletons hard-coded `max-version="32"` and could not be enabled on NC 33; the value now follows the running server
+- Settings tab showed a stale hard-coded version label
+
+### Changed
+- Controllers use `#[NoAdminRequired]` / `#[NoCSRFRequired]` attributes instead of docblock annotations (deprecated, logged on every request by NC 33); the generated skeleton controller does the same
+- Upload form uses the template `requesttoken` instead of the deprecated `Util::callRegister()`
+- Dev dependency `nextcloud/ocp` pinned to `^33.0` (`dev-master` now requires PHP 8.3); CI matrix is PHP 8.2–8.4. Runtime requirement stays PHP 8.1+ for NC 30
+
 ## [1.3.4] - 2026-05-28
 
 ### Fixed

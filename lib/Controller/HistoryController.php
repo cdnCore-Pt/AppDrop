@@ -12,6 +12,8 @@ namespace OCA\AppDrop\Controller;
 use OCA\AppDrop\Service\PermissionService;
 use OCA\AppDrop\Service\UploadHistoryService;
 use OCP\AppFramework\Controller;
+use OCP\AppFramework\Http\Attribute\NoAdminRequired;
+use OCP\AppFramework\Http\Attribute\NoCSRFRequired;
 use OCP\AppFramework\Http\JSONResponse;
 use OCP\IGroupManager;
 use OCP\IRequest;
@@ -33,10 +35,9 @@ class HistoryController extends Controller {
 
 	/**
 	 * List upload history (paginated).
-	 *
-	 * @NoAdminRequired
-	 * @NoCSRFRequired
 	 */
+	#[NoAdminRequired]
+	#[NoCSRFRequired]
 	public function list(): JSONResponse {
 		$denied = $this->denyIfCannotUpload();
 		if ($denied !== null) {

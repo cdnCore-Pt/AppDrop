@@ -10,7 +10,7 @@
         appinfo/info.xml verification), extract it safely into a writable apps path, set correct
         permissions, and enable it — all without SSH access.
     ]]></description>
-    <version>1.3.4</version>
+    <version>1.4.0</version>
     <licence>AGPL-3.0-or-later</licence>
     <author>Mehran Pourvahab</author>
     <author>Henrique Rodrigues</author>
@@ -30,10 +30,10 @@
         <admin>https://github.com/cdnCore-Pt/AppDrop#usage</admin>
     </documentation>
     <dependencies>
-        <nextcloud min-version="30" max-version="32"/>
+        <nextcloud min-version="30" max-version="33"/>
         <php min-version="8.1"/>
     </dependencies>
-    <!-- Navigation is registered dynamically in Application::register()
+    <!-- Navigation is registered dynamically in Application::boot()
          so it only appears for users with upload permission. -->
     <settings>
         <admin>OCA\AppDrop\Settings\AdminSettings</admin>

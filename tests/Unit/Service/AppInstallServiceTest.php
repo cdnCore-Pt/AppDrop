@@ -7,6 +7,7 @@ namespace OCA\AppDrop\Tests\Unit\Service;
 use OCA\AppDrop\Service\AppInstallException;
 use OCA\AppDrop\Service\AppInstallService;
 use OCA\AppDrop\Service\AppPathResolver;
+use OCA\AppDrop\Service\AppUpgradeService;
 use OCP\App\IAppManager;
 use OCP\IConfig;
 use OCP\ITempManager;
@@ -35,6 +36,7 @@ class AppInstallServiceTest extends TestCase {
 			$this->tempManager,
 			$this->appManager,
 			$this->config,
+			new AppUpgradeService($this->appManager, $this->config, $this->logger),
 			$this->logger,
 		);
 	}
@@ -213,5 +215,174 @@ class AppInstallServiceTest extends TestCase {
 		$this->assertSame('test_app', $result['appId']);
 		$this->assertSame('0.0.0', $result['version']);
 		$this->assertSame('test_app', $result['name']);
+	}
+
+	// =========================================================================
+	// End-to-end install() flow (real zip, real temp apps dir)
+	// =========================================================================
+
+	private function makeAppsDir(): string {
+		$dir = sys_get_temp_dir() . '/appdrop_apps_' . uniqid();
+		mkdir($dir, 0755, true);
+		return $dir;
+	}
+
+	private function makeAppZip(string $dir, string $appId, string $version): string {
+		$path = $dir . '/' . $appId . '-' . $version . '.zip';
+		$zip = new \ZipArchive();
+		$zip->open($path, \ZipArchive::CREATE);
+		$zip->addEmptyDir($appId);
+		$zip->addFromString(
+			$appId . '/appinfo/info.xml',
+			"<?xml version=\"1.0\"?><info><id>{$appId}</id><name>Demo</name><version>{$version}</version></info>",
+		);
+		$zip->addFromString($appId . '/lib/AppInfo/Application.php', '<?php');
+		$zip->close();
+		return $path;
+	}
+
+	private function removeDir(string $path): void {
+		if (!is_dir($path)) {
+			return;
+		}
+		$it = new \RecursiveIteratorIterator(
+			new \RecursiveDirectoryIterator($path, \FilesystemIterator::SKIP_DOTS),
+			\RecursiveIteratorIterator::CHILD_FIRST,
+		);
+		foreach ($it as $item) {
+			$item->isDir() ? rmdir($item->getPathname()) : unlink($item->getPathname());
+		}
+		rmdir($path);
+	}
+
+	/**
+	 * Wires the mocks so install() can run end-to-end against $appsDir.
+	 *
+	 * @param string $installedVersion what oc_appconfig says about dropdemo ('' = unknown to the DB)
+	 */
+	private function wireInstall(string $appsDir, string $installedVersion = ''): void {
+		$this->pathResolver->method('resolveWritablePath')->willReturn($appsDir);
+		$this->tempManager->method('getTemporaryFile')->willReturn($appsDir . '/upload.tmp.zip');
+		$this->config->method('getAppValue')->willReturnCallback(
+			static fn (string $app, string $key, $default) => match ($key) {
+				'max_upload_size_mb' => '20',
+				'installed_version' => $installedVersion,
+				default => $default,
+			},
+		);
+	}
+
+	private function makeExistingApp(string $appsDir, string $appId, string $version): void {
+		mkdir($appsDir . '/' . $appId . '/appinfo', 0755, true);
+		file_put_contents(
+			$appsDir . '/' . $appId . '/appinfo/info.xml',
+			"<?xml version=\"1.0\"?><info><id>{$appId}</id><version>{$version}</version></info>",
+		);
+	}
+
+	public function testFreshInstallEnablesButDoesNotUpgrade(): void {
+		$appsDir = $this->makeAppsDir();
+		$this->wireInstall($appsDir);
+		$zip = $this->makeAppZip($appsDir, 'dropdemo', '1.0.0');
+
+		$this->appManager->expects($this->never())->method('upgradeApp');
+		$this->appManager->expects($this->once())->method('enableApp')->with('dropdemo');
+
+		$result = $this->service->install(['name' => 'dropdemo.zip', 'tmp_name' => $zip, 'error' => UPLOAD_ERR_OK]);
+
+		$this->assertTrue($result['success']);
+		$this->assertFalse($result['isUpdate']);
+		$this->assertSame('1.0.0', $result['version']);
+		$this->assertFileExists($appsDir . '/dropdemo/appinfo/info.xml');
+
+		$this->removeDir($appsDir);
+	}
+
+	public function testUpdateRunsAppUpgradeSoInstanceDoesNotEnterUpgradeMode(): void {
+		$appsDir = $this->makeAppsDir();
+		$this->wireInstall($appsDir, '1.0.0');
+		$this->makeExistingApp($appsDir, 'dropdemo', '1.0.0');
+		$zip = $this->makeAppZip($appsDir, 'dropdemo', '1.1.0');
+
+		// Without this, installed_version (1.0.0) != code version (1.1.0) and Nextcloud
+		// answers 503 "upgrade needed" to every request until `occ upgrade`.
+		$this->appManager->expects($this->once())->method('upgradeApp')->with('dropdemo')->willReturn(true);
+		$this->appManager->expects($this->once())->method('enableApp')->with('dropdemo');
+
+		$result = $this->service->install(['name' => 'dropdemo.zip', 'tmp_name' => $zip, 'error' => UPLOAD_ERR_OK]);
+
+		$this->assertTrue($result['isUpdate']);
+		$this->assertSame('1.0.0', $result['previousVersion']);
+		$this->assertSame('1.1.0', $result['version']);
+		$this->assertNotEmpty(glob($appsDir . '/dropdemo_backup_*'), 'previous version must be backed up');
+
+		$this->removeDir($appsDir);
+	}
+
+	public function testUpdateUpgradesEvenWhenAutoEnableIsOff(): void {
+		$appsDir = $this->makeAppsDir();
+		$this->wireInstall($appsDir, '1.0.0');
+		$this->makeExistingApp($appsDir, 'dropdemo', '1.0.0');
+		$zip = $this->makeAppZip($appsDir, 'dropdemo', '1.1.0');
+
+		$this->appManager->expects($this->once())->method('upgradeApp')->with('dropdemo')->willReturn(true);
+		$this->appManager->expects($this->never())->method('enableApp');
+
+		$this->service->install(['name' => 'dropdemo.zip', 'tmp_name' => $zip, 'error' => UPLOAD_ERR_OK], false);
+
+		$this->removeDir($appsDir);
+	}
+
+	public function testUpdateReportsUpgradeFailureWithOccHint(): void {
+		$appsDir = $this->makeAppsDir();
+		$this->wireInstall($appsDir, '1.0.0');
+		$this->makeExistingApp($appsDir, 'dropdemo', '1.0.0');
+		$zip = $this->makeAppZip($appsDir, 'dropdemo', '1.1.0');
+
+		$this->appManager->method('upgradeApp')->willThrowException(new \RuntimeException('migration boom'));
+		$this->logger->expects($this->atLeastOnce())->method('error');
+
+		try {
+			$this->service->install(['name' => 'dropdemo.zip', 'tmp_name' => $zip, 'error' => UPLOAD_ERR_OK]);
+			$this->fail('expected AppInstallException');
+		} catch (AppInstallException $e) {
+			$this->assertStringContainsString('occ upgrade', $e->getMessage());
+			$this->assertStringContainsString('migration boom', $e->getMessage());
+		}
+
+		$this->removeDir($appsDir);
+	}
+
+	public function testReinstallAfterRemoveUpgradesWhenDbStillKnowsAnotherVersion(): void {
+		$appsDir = $this->makeAppsDir();
+		// Directory is gone (removed via AppDrop or `occ app:remove`) but the DB
+		// still records 1.1.0; re-installing 1.0.0 must reconcile or NC goes 503.
+		$this->wireInstall($appsDir, '1.1.0');
+		$zip = $this->makeAppZip($appsDir, 'dropdemo', '1.0.0');
+
+		$this->appManager->expects($this->once())->method('upgradeApp')->with('dropdemo')->willReturn(true);
+		$this->appManager->expects($this->once())->method('enableApp')->with('dropdemo');
+
+		$result = $this->service->install(['name' => 'dropdemo.zip', 'tmp_name' => $zip, 'error' => UPLOAD_ERR_OK]);
+
+		$this->assertFalse($result['isUpdate']);
+
+		$this->removeDir($appsDir);
+	}
+
+	public function testReuploadingSameVersionDoesNotUpgrade(): void {
+		$appsDir = $this->makeAppsDir();
+		$this->wireInstall($appsDir, '1.0.0');
+		$this->makeExistingApp($appsDir, 'dropdemo', '1.0.0');
+		$zip = $this->makeAppZip($appsDir, 'dropdemo', '1.0.0');
+
+		$this->appManager->expects($this->never())->method('upgradeApp');
+		$this->appManager->expects($this->once())->method('enableApp')->with('dropdemo');
+
+		$result = $this->service->install(['name' => 'dropdemo.zip', 'tmp_name' => $zip, 'error' => UPLOAD_ERR_OK]);
+
+		$this->assertTrue($result['isUpdate']);
+
+		$this->removeDir($appsDir);
 	}
 }

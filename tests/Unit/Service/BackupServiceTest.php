@@ -6,6 +6,7 @@ namespace OCA\AppDrop\Tests\Unit\Service;
 
 use OCA\AppDrop\Service\AppInstallException;
 use OCA\AppDrop\Service\AppPathResolver;
+use OCA\AppDrop\Service\AppUpgradeService;
 use OCA\AppDrop\Service\BackupService;
 use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
@@ -13,14 +14,16 @@ use Psr\Log\LoggerInterface;
 
 class BackupServiceTest extends TestCase {
 	private AppPathResolver&MockObject $pathResolver;
+	private AppUpgradeService&MockObject $upgrader;
 	private LoggerInterface&MockObject $logger;
 	private BackupService $service;
 	private string $tmpDir;
 
 	protected function setUp(): void {
 		$this->pathResolver = $this->createMock(AppPathResolver::class);
+		$this->upgrader = $this->createMock(AppUpgradeService::class);
 		$this->logger = $this->createMock(LoggerInterface::class);
-		$this->service = new BackupService($this->pathResolver, $this->logger);
+		$this->service = new BackupService($this->pathResolver, $this->upgrader, $this->logger);
 
 		$this->tmpDir = sys_get_temp_dir() . '/appdrop_backup_test_' . uniqid();
 		mkdir($this->tmpDir, 0755, true);
@@ -118,9 +121,7 @@ class BackupServiceTest extends TestCase {
 
 	public function testRestoreMovesBackupToAppDir(): void {
 		$backupDir = $this->tmpDir . '/myapp_backup_20260315_120000';
-		mkdir($backupDir);
-		file_put_contents($backupDir . '/appinfo/info.xml', '<info/>', 0, null);
-		@mkdir($backupDir . '/appinfo', 0755, true);
+		mkdir($backupDir . '/appinfo', 0755, true);
 		file_put_contents($backupDir . '/appinfo/info.xml', '<info/>');
 
 		$this->service->restore('myapp_backup_20260315_120000');
@@ -157,6 +158,18 @@ class BackupServiceTest extends TestCase {
 	public function testRestoreThrowsForNonExistentBackup(): void {
 		$this->expectException(AppInstallException::class);
 		$this->expectExceptionMessage('not found');
+
+		$this->service->restore('myapp_backup_20260315_120000');
+	}
+
+	public function testRestoreReconcilesInstalledVersionOfRestoredCode(): void {
+		// Restoring swaps the code on disk; the DB must be brought in line or
+		// Nextcloud answers 503 "upgrade needed" until `occ upgrade`.
+		$backupDir = $this->tmpDir . '/myapp_backup_20260315_120000';
+		mkdir($backupDir . '/appinfo', 0755, true);
+		file_put_contents($backupDir . '/appinfo/info.xml', '<info/>');
+
+		$this->upgrader->expects($this->once())->method('reconcile')->with('myapp', $this->tmpDir . '/myapp');
 
 		$this->service->restore('myapp_backup_20260315_120000');
 	}

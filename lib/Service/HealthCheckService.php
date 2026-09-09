@@ -250,7 +250,7 @@ class HealthCheckService {
 		// ── Nextcloud version dependency ─────────────────────────────────────
 		$ncDeps = $xml->dependencies->nextcloud ?? null;
 		if ($ncDeps === null) {
-			$checks[] = ['label' => 'Nextcloud Compatibility', 'status' => 'warn', 'detail' => 'No Nextcloud version dependency declared.', 'fix' => 'Add <dependencies><nextcloud min-version="30" max-version="32"/></dependencies> to info.xml.'];
+			$checks[] = ['label' => 'Nextcloud Compatibility', 'status' => 'warn', 'detail' => 'No Nextcloud version dependency declared.', 'fix' => 'Add <dependencies><nextcloud min-version="30" max-version="33"/></dependencies> to info.xml.'];
 			$warnings[] = 'No Nextcloud version dependency declared.';
 		} else {
 			$minNc = (string)($ncDeps['min-version'] ?? '');

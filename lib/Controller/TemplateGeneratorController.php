@@ -13,6 +13,7 @@ use OCA\AppDrop\Service\AppInstallException;
 use OCA\AppDrop\Service\PermissionService;
 use OCA\AppDrop\Service\TemplateGeneratorService;
 use OCP\AppFramework\Controller;
+use OCP\AppFramework\Http\Attribute\NoAdminRequired;
 use OCP\AppFramework\Http\DataDownloadResponse;
 use OCP\AppFramework\Http\JSONResponse;
 use OCP\IGroupManager;
@@ -37,9 +38,8 @@ class TemplateGeneratorController extends Controller {
 
 	/**
 	 * Generate a Nextcloud app skeleton and return as zip download.
-	 *
-	 * @NoAdminRequired
 	 */
+	#[NoAdminRequired]
 	public function generate(): DataDownloadResponse|JSONResponse {
 		$denied = $this->denyIfCannotUpload();
 		if ($denied !== null) {

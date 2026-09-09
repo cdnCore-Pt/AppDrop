@@ -11,6 +11,7 @@ namespace OCA\AppDrop\Controller;
 
 use OCA\AppDrop\Service\PermissionService;
 use OCP\AppFramework\Controller;
+use OCP\AppFramework\Http\Attribute\NoCSRFRequired;
 use OCP\AppFramework\Http\JSONResponse;
 use OCP\IGroupManager;
 use OCP\IRequest;
@@ -33,9 +34,8 @@ class PermissionController extends Controller {
 
 	/**
 	 * Get current permissions (allowed users and groups).
-	 *
-	 * @NoCSRFRequired
 	 */
+	#[NoCSRFRequired]
 	public function get(): JSONResponse {
 		$denied = $this->denyIfNotAdmin();
 		if ($denied !== null) {
@@ -115,9 +115,8 @@ class PermissionController extends Controller {
 
 	/**
 	 * Search users for autocomplete.
-	 *
-	 * @NoCSRFRequired
 	 */
+	#[NoCSRFRequired]
 	public function searchUsers(): JSONResponse {
 		$denied = $this->denyIfNotAdmin();
 		if ($denied !== null) {
@@ -143,9 +142,8 @@ class PermissionController extends Controller {
 
 	/**
 	 * Search groups for autocomplete.
-	 *
-	 * @NoCSRFRequired
 	 */
+	#[NoCSRFRequired]
 	public function searchGroups(): JSONResponse {
 		$denied = $this->denyIfNotAdmin();
 		if ($denied !== null) {

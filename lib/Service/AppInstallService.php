@@ -14,9 +14,6 @@ use OCP\IConfig;
 use OCP\ITempManager;
 use Psr\Log\LoggerInterface;
 
-class AppInstallException extends \RuntimeException {
-}
-
 /**
  * Handles app package upload, validation and installation.
  *
@@ -41,6 +38,7 @@ class AppInstallService {
 		private readonly ITempManager $tempManager,
 		private readonly IAppManager $appManager,
 		private readonly IConfig $config,
+		private readonly AppUpgradeService $upgrader,
 		private readonly LoggerInterface $logger,
 	) {
 	}
@@ -99,6 +97,9 @@ class AppInstallService {
 			$this->extractZip($tempPath, $targetPath, $zipInfo['topLevelPrefix']);
 			$this->ensureAppIcon($targetPath, $appId);
 			$this->chmodRecursive($targetPath);
+			// Update, or re-install after a remove (neither AppDrop nor `occ app:remove`
+			// clears installed_version): bring the DB in line with the new code.
+			$this->upgrader->reconcile($appId, $targetPath);
 			if ($autoEnable) {
 				$this->enableApp($appId);
 			}

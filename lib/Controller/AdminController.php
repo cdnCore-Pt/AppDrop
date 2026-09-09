@@ -14,6 +14,8 @@ use OCA\AppDrop\Service\AppInstallService;
 use OCA\AppDrop\Service\PermissionService;
 use OCA\AppDrop\Service\UploadHistoryService;
 use OCP\AppFramework\Controller;
+use OCP\AppFramework\Http\Attribute\NoAdminRequired;
+use OCP\AppFramework\Http\Attribute\NoCSRFRequired;
 use OCP\AppFramework\Http\JSONResponse;
 use OCP\AppFramework\Http\TemplateResponse;
 use OCP\IConfig;
@@ -39,10 +41,8 @@ class AdminController extends Controller {
 		parent::__construct($appName, $request);
 	}
 
-	/**
-	 * @NoAdminRequired
-	 * @NoCSRFRequired
-	 */
+	#[NoAdminRequired]
+	#[NoCSRFRequired]
 	public function index(): TemplateResponse {
 		if (!$this->canUpload()) {
 			return new TemplateResponse(
@@ -65,9 +65,8 @@ class AdminController extends Controller {
 
 	/**
 	 * Receives the zip upload, validates and installs/updates the app.
-	 *
-	 * @NoAdminRequired
 	 */
+	#[NoAdminRequired]
 	public function install(): JSONResponse {
 		$denied = $this->denyIfCannotUpload();
 		if ($denied !== null) {

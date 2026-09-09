@@ -20,11 +20,11 @@ $autoEnableDefault = $_['autoEnableDefault'] ?? true;
 
 <form id="aum-form"
       method="post"
-      action="<?php print_unescaped(\OC::$server->getURLGenerator()->linkToRoute('appdrop.admin.install')); ?>"
+      action="<?php print_unescaped(\OCP\Server::get(\OCP\IURLGenerator::class)->linkToRoute('appdrop.admin.install')); ?>"
       enctype="multipart/form-data"
       novalidate>
 
-    <input type="hidden" name="requesttoken" value="<?php p(\OCP\Util::callRegister()); ?>">
+    <input type="hidden" name="requesttoken" value="<?php p($_['requesttoken']); ?>">
     <input type="hidden" id="aum-max-size-mb" value="<?php p($maxSizeMB); ?>">
 
     <!-- Dropzone wrapper -->
