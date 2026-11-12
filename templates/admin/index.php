@@ -25,7 +25,7 @@ if ($isAdmin) {
 }
 ?>
 
-<div id="app-navigation">
+<div id="app-navigation" data-toggle-label="<?php p($l->t('Menu')); ?>">
         <ul>
             <li class="active" data-section="upload">
                 <a href="#upload">
@@ -103,7 +103,7 @@ if ($isAdmin) {
 
         <div id="app-settings">
             <div id="app-settings-header">
-                <button class="settings-button" data-apps-slide-toggle="#app-settings-content">
+                <button class="settings-button" aria-expanded="false" aria-controls="app-settings-content">
                     <?php p($l->t('Settings')); ?>
                 </button>
             </div>

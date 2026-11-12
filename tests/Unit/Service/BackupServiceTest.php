@@ -13,6 +13,16 @@ use PHPUnit\Framework\TestCase;
 use Psr\Log\LoggerInterface;
 
 class BackupServiceTest extends TestCase {
+	public function testFreeBackupPathNeverReturnsAnExistingDirectory(): void {
+		$app = $this->tmpDir . '/myapp';
+		mkdir(BackupService::freeBackupPath($app));
+
+		$second = BackupService::freeBackupPath($app);
+
+		$this->assertDirectoryDoesNotExist($second);
+		$this->assertMatchesRegularExpression('/myapp_backup_\d{8}_\d{6}$/', $second);
+	}
+
 	private AppPathResolver&MockObject $pathResolver;
 	private AppUpgradeService&MockObject $upgrader;
 	private LoggerInterface&MockObject $logger;

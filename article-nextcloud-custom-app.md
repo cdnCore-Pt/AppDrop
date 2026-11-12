@@ -85,7 +85,7 @@ A detailed description of your app. This field supports **Markdown**.
 
     <dependencies>
         <php min-version="8.1"/>
-        <nextcloud min-version="30" max-version="32"/>
+        <nextcloud min-version="30" max-version="35"/>
     </dependencies>
 
     <!-- Register a navigation entry -->

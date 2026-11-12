@@ -7,6 +7,7 @@ namespace OCA\AppDrop\Tests\Unit\Service;
 use OCA\AppDrop\Service\AppInstallException;
 use OCA\AppDrop\Service\AppManagerService;
 use OCA\AppDrop\Service\AppPathResolver;
+use OCA\AppDrop\Service\AppUpgradeService;
 use OCP\App\IAppManager;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\MockObject\MockObject;
@@ -18,13 +19,15 @@ class AppManagerServiceTest extends TestCase {
 	private IAppManager&MockObject $appManager;
 	private LoggerInterface&MockObject $logger;
 	private AppManagerService $service;
+	private AppUpgradeService&MockObject $upgrader;
 	private string $tmpDir;
 
 	protected function setUp(): void {
 		$this->pathResolver = $this->createMock(AppPathResolver::class);
 		$this->appManager = $this->createMock(IAppManager::class);
 		$this->logger = $this->createMock(LoggerInterface::class);
-		$this->service = new AppManagerService($this->pathResolver, $this->appManager, $this->logger);
+		$this->upgrader = $this->createMock(AppUpgradeService::class);
+		$this->service = new AppManagerService($this->pathResolver, $this->appManager, $this->upgrader, $this->logger);
 
 		$this->tmpDir = sys_get_temp_dir() . '/appdrop_mgr_test_' . uniqid();
 		mkdir($this->tmpDir, 0755, true);
@@ -129,24 +132,42 @@ class AppManagerServiceTest extends TestCase {
 	// enableApp() / disableApp()
 	// =========================================================================
 
-	public function testEnableAppCallsAppManager(): void {
-		// enableApp succeeds via native API (no occ fallback)
-		$this->appManager->expects($this->once())
-			->method('enableApp')
-			->with('my_app');
+	public function testEnableAppDelegatesToTheSharedEnableRoutine(): void {
+		$this->upgrader->expects($this->once())->method('enable')->with('my_app');
 
 		$this->service->enableApp('my_app');
 	}
 
-	public function testEnableAppFallsBackToOccOnFailure(): void {
-		// When native API throws, the service tries occ which needs OC::$SERVERROOT.
-		// Since we can't run occ in tests, just verify the exception propagates.
-		$this->appManager->method('enableApp')
-			->willThrowException(new \RuntimeException('native failed'));
+	public function testDisableAppRefusesAppDropItself(): void {
+		$this->appManager->expects($this->never())->method('disableApp');
+		$this->expectException(AppInstallException::class);
 
-		$this->expectException(\Throwable::class);
+		$this->service->disableApp('appdrop');
+	}
 
-		$this->service->enableApp('my_app');
+	public function testRemoveAppRefusesAppDropItself(): void {
+		$this->createApp('appdrop');
+		$this->appManager->expects($this->never())->method('disableApp');
+
+		try {
+			$this->service->removeApp('appdrop');
+			$this->fail('expected AppInstallException');
+		} catch (AppInstallException) {
+			$this->assertDirectoryExists($this->tmpDir . '/appdrop');
+		}
+	}
+
+	public function testDisableAppWrapsCoreRefusalAndLogsOriginal(): void {
+		// e.g. shipped apps: core throws "files can't be disabled" → was an HTTP 500
+		$boom = new \Exception("files can't be disabled.");
+		$this->appManager->method('disableApp')->willThrowException($boom);
+		$this->logger->expects($this->once())->method('warning')
+			->with($this->anything(), $this->callback(fn (array $ctx) => ($ctx['exception'] ?? null) === $boom));
+
+		$this->expectException(AppInstallException::class);
+		$this->expectExceptionMessage("can't be disabled");
+
+		$this->service->disableApp('files');
 	}
 
 	public function testDisableAppCallsAppManager(): void {
@@ -183,6 +204,14 @@ class AppManagerServiceTest extends TestCase {
 			->with('my_app');
 
 		$this->service->removeApp('my_app');
+	}
+
+	public function testRemoveAppDoesNotDisableAppsItCannotRemove(): void {
+		// e.g. a shipped app: not in the writable apps path, must stay untouched
+		$this->appManager->expects($this->never())->method('disableApp');
+		$this->expectException(AppInstallException::class);
+
+		$this->service->removeApp('weather_status');
 	}
 
 	public function testRemoveAppThrowsForNonExistentApp(): void {

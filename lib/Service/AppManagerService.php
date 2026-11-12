@@ -16,11 +16,13 @@ use Psr\Log\LoggerInterface;
  * Manages custom apps: list, enable, disable, remove.
  */
 class AppManagerService {
+	private const APP_ID = 'appdrop';
 	private const APPID_PATTERN = '/^[a-z0-9_]{3,64}$/';
 
 	public function __construct(
 		private readonly AppPathResolver $pathResolver,
 		private readonly IAppManager $appManager,
+		private readonly AppUpgradeService $upgrader,
 		private readonly LoggerInterface $logger,
 	) {
 	}
@@ -87,12 +89,7 @@ class AppManagerService {
 	public function enableApp(string $appId): void {
 		$this->validateAppId($appId);
 
-		try {
-			$this->appManager->enableApp($appId);
-		} catch (\Throwable $e) {
-			// Fallback to occ
-			$this->runOcc('app:enable', $appId);
-		}
+		$this->upgrader->enable($appId);
 	}
 
 	/**
@@ -100,7 +97,15 @@ class AppManagerService {
 	 */
 	public function disableApp(string $appId): void {
 		$this->validateAppId($appId);
-		$this->appManager->disableApp($appId);
+		$this->refuseSelf($appId);
+
+		try {
+			$this->appManager->disableApp($appId);
+		} catch (\Throwable $e) {
+			// e.g. core refuses shipped apps ("files can't be disabled")
+			$this->logger->warning('[AppDrop] disableApp failed', ['app' => self::APP_ID, 'appId' => $appId, 'exception' => $e]);
+			throw new AppInstallException("Could not disable '{$appId}': {$e->getMessage()}");
+		}
 	}
 
 	/**
@@ -108,23 +113,30 @@ class AppManagerService {
 	 */
 	public function removeApp(string $appId): void {
 		$this->validateAppId($appId);
+		$this->refuseSelf($appId);
 
-		// Disable first
+		$basePath = $this->pathResolver->resolveWritablePath();
+		$appPath = $basePath . '/' . $appId;
+
+		// Before disabling: never touch apps we cannot remove (shipped apps)
+		if (!is_dir($appPath)) {
+			throw new AppInstallException("App '{$appId}' not found at '{$appPath}'.");
+		}
+
 		try {
 			$this->appManager->disableApp($appId);
 		} catch (\Throwable) {
 			// May already be disabled
 		}
 
-		$basePath = $this->pathResolver->resolveWritablePath();
-		$appPath = $basePath . '/' . $appId;
-
-		if (!is_dir($appPath)) {
-			throw new AppInstallException("App '{$appId}' not found at '{$appPath}'.");
-		}
-
 		$this->removeDirectory($appPath);
 		$this->logger->info("[AppDrop] Removed app '{$appId}' from '{$appPath}'.");
+	}
+
+	private function refuseSelf(string $appId): void {
+		if ($appId === self::APP_ID) {
+			throw new AppInstallException('AppDrop cannot disable or remove itself. Use Settings → Apps or occ instead.');
+		}
 	}
 
 	private function validateAppId(string $appId): void {
@@ -176,18 +188,5 @@ class AppManagerService {
 		}
 
 		rmdir($path);
-	}
-
-	private function runOcc(string $command, string $appId): void {
-		$occ = \OC::$SERVERROOT . '/occ';
-		$escapedOcc = escapeshellarg($occ);
-		$escapedAppId = escapeshellarg($appId);
-
-		exec("php {$escapedOcc} {$command} {$escapedAppId} 2>&1", $output, $exitCode);
-
-		if ($exitCode !== 0) {
-			$msg = implode(' ', $output);
-			throw new AppInstallException("occ {$command} failed: {$msg}");
-		}
 	}
 }

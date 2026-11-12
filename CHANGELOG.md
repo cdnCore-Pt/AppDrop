@@ -5,6 +5,35 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.5.0] - 2026-11-12
+
+### Added
+- Nextcloud 34 and 35 support (`max-version="35"`); verified end-to-end on 35.0.2, 34.0.5, 33 and 30
+
+### Fixed
+- Nextcloud 34+: the "Settings" button in the sidebar did nothing and the sidebar could not be opened on screens narrower than 1024px (core removed `OC.Apps` and the global snapper); AppDrop now drives both itself
+- Nextcloud 33+: success/error/warning messages and buttons were nearly invisible because core turned `--color-success`/`--color-error`/`--color-warning` into pale background tints
+- Header links of other apps (Files, ...) could render with an empty URL for users who see the AppDrop entry: the navigation entry is now registered lazily
+- Zips without folder entries (`zip -D`, Python `zipfile`, and AppDrop's own template generator) were rejected with "does not contain 'appinfo/info.xml'" by both the installer and the health check
+- Zips with Windows backslash entry names and no folder entries are now accepted as well
+- Flat zips made with `zip -r` inside the app folder (first entry `lib/`, `css/`, ...) had that first folder mistaken for a wrapper and stripped, installing a broken app; flat zips starting with `appinfo/` were rejected
+- A new app uploaded on Nextcloud 30/31 was only flagged as enabled: its migrations never ran and `installed_version` was never stored, so later updates skipped migrations too. New apps are now installed through `occ app:enable` (when PHP `exec()` is available), and apps left in that half-installed state by earlier AppDrop versions are repaired the next time they are enabled or updated with auto-enable on
+- Uploading an update within a few seconds of the previous install/update reported success but left the whole instance answering 503 "upgrade needed" (stale app-config cache, and Nextcloud's info.xml cache keyed by a 1-second mtime); the installed version is now read straight from the database, the new `info.xml` always gets a newer mtime, and AppDrop reports an error instead of success if the recorded version still did not move
+- Two backups of the same app within one second collided, so the second update/restore failed or lost the previous copy
+- Removing an app that is not in the writable apps folder (e.g. a shipped app) failed with "not found" but disabled it anyway
+- Files with `..` inside their name (e.g. `app..min.js`) aborted the extraction after the old version had already been moved away
+- The Install / Update button showed its icon twice after an upload
+- The Apps tab could disable or delete AppDrop itself, and disabling an app that core protects (e.g. `files`) returned an HTTP 500 page instead of an error message
+- Install message said "installed and enabled" even with auto-enable off
+- Enable/Disable/Remove/Install buttons never got their colours (core button styles won on specificity); badges, status buttons and dark-theme status text now meet WCAG AA contrast
+- Health check hint for a missing Nextcloud dependency suggested a hard-coded `max-version="33"`
+
+### Security
+- Zips in which two entries resolve to the same path (a duplicated `appinfo/info.xml`, aliases such as `./appinfo/info.xml` and `appinfo//info.xml`, or a name used both as a file and as a folder) are rejected by the installer and flagged by the health check: validation and extraction could read different copies, bypassing the app-ID match and self-update guards
+
+### Changed
+- CI also runs on PHP 8.5 and against `nextcloud/ocp ^35`; the package test now verifies every hash in `signature.json`
+
 ## [1.4.0] - 2026-09-09
 
 ### Added

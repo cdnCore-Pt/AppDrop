@@ -48,6 +48,7 @@ class HealthCheckService {
 		$iconIndex = null;
 		$iconExt = '';
 		$securityOk = true;
+		$seenPaths = [];
 		$applicationPhpContent = null;
 		$routesPhpContent = null;
 
@@ -59,8 +60,8 @@ class HealthCheckService {
 			$normalised = str_replace('\\', '/', $entryName);
 			$entries[] = $normalised;
 
-			if ($i === 0 && str_ends_with($normalised, '/') && substr_count($normalised, '/') === 1) {
-				$topLevelPrefix = $normalised;
+			if ($i === 0) {
+				$topLevelPrefix = AppInstallService::detectTopLevelPrefix($zip);
 			}
 
 			// Security checks
@@ -81,6 +82,14 @@ class HealthCheckService {
 				$relative = substr($normalised, strlen($topLevelPrefix));
 			}
 			$relativeEntries[] = $relative;
+			$entryOk = !str_starts_with($normalised, '/') && !in_array('..', explode('/', $normalised), true);
+			$problem = $entryOk ? AppInstallService::ambiguousPathProblem($relative, $seenPaths) : null;
+			if ($problem !== null) {
+				if (!in_array('Security: ' . $problem, $errors, true)) {
+					$errors[] = 'Security: ' . $problem;
+				}
+				$securityOk = false;
+			}
 
 			if ($relative === 'appinfo/info.xml') {
 				$infoXmlContent = $zip->getFromIndex($i);
@@ -250,7 +259,7 @@ class HealthCheckService {
 		// ── Nextcloud version dependency ─────────────────────────────────────
 		$ncDeps = $xml->dependencies->nextcloud ?? null;
 		if ($ncDeps === null) {
-			$checks[] = ['label' => 'Nextcloud Compatibility', 'status' => 'warn', 'detail' => 'No Nextcloud version dependency declared.', 'fix' => 'Add <dependencies><nextcloud min-version="30" max-version="33"/></dependencies> to info.xml.'];
+			$checks[] = ['label' => 'Nextcloud Compatibility', 'status' => 'warn', 'detail' => 'No Nextcloud version dependency declared.', 'fix' => 'Add <dependencies><nextcloud min-version="30" max-version="NN"/></dependencies> to info.xml, where NN is the newest Nextcloud major version you tested on.'];
 			$warnings[] = 'No Nextcloud version dependency declared.';
 		} else {
 			$minNc = (string)($ncDeps['min-version'] ?? '');

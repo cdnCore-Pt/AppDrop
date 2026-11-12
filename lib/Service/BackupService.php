@@ -64,6 +64,19 @@ class BackupService {
 	}
 
 	/**
+	 * Backup path for $appPath that does not exist yet. Names have 1 s
+	 * resolution, so a second backup in the same second waits for the next one
+	 * instead of colliding (rename onto a non-empty dir fails).
+	 */
+	public static function freeBackupPath(string $appPath): string {
+		// ponytail: sleeps up to ~1 s per collision; switch to a suffix if BACKUP_PATTERN ever allows one
+		while (file_exists($path = $appPath . '_backup_' . date('Ymd_His'))) {
+			usleep(200_000);
+		}
+		return $path;
+	}
+
+	/**
 	 * Restore a backup: rename backup dir → app dir.
 	 */
 	public function restore(string $dirName): void {
@@ -82,7 +95,7 @@ class BackupService {
 
 		// If current app exists, back it up first
 		if (is_dir($appPath)) {
-			$newBackup = $appPath . '_backup_' . date('Ymd_His');
+			$newBackup = self::freeBackupPath($appPath);
 			if (!rename($appPath, $newBackup)) {
 				throw new AppInstallException("Could not back up current app '{$appId}' before restoring.");
 			}

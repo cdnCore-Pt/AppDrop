@@ -24,7 +24,7 @@
     var messageArea = document.getElementById('aum-message');
     var dropzone = document.getElementById('aum-dropzone');
     var fileQueue = document.getElementById('aum-file-queue');
-    var defaultBtnText = submitBtn ? submitBtn.textContent.trim() : 'Install / Update';
+    var defaultBtnText = submitBtn ? submitBtn.textContent.replace('\u21EA', '').trim() : 'Install / Update';
 
     // Each entry: { file: File, validated: bool, valid: bool, report: object|null }
     var pendingFiles = [];

@@ -7,8 +7,8 @@ namespace OCA\AppDrop\Tests\Unit\Service;
 use OCA\AppDrop\Service\AppInstallException;
 use OCA\AppDrop\Service\AppInstallService;
 use OCA\AppDrop\Service\AppPathResolver;
-use OCA\AppDrop\Service\AppUpgradeService;
 use OCP\App\IAppManager;
+use OCP\IAppConfig;
 use OCP\IConfig;
 use OCP\ITempManager;
 use PHPUnit\Framework\Attributes\DataProvider;
@@ -23,6 +23,7 @@ class AppInstallServiceTest extends TestCase {
 	private IConfig&MockObject $config;
 	private LoggerInterface&MockObject $logger;
 	private AppInstallService $service;
+	private RecordingUpgradeService $upgrader;
 
 	protected function setUp(): void {
 		$this->pathResolver = $this->createMock(AppPathResolver::class);
@@ -31,12 +32,15 @@ class AppInstallServiceTest extends TestCase {
 		$this->config = $this->createMock(IConfig::class);
 		$this->logger = $this->createMock(LoggerInterface::class);
 
+		$this->upgrader = new RecordingUpgradeService($this->appManager, $this->createMock(IAppConfig::class), $this->logger);
+		$this->upgrader->installedVersionReader = static fn (): string => '';
+
 		$this->service = new AppInstallService(
 			$this->pathResolver,
 			$this->tempManager,
 			$this->appManager,
 			$this->config,
-			new AppUpgradeService($this->appManager, $this->config, $this->logger),
+			$this->upgrader,
 			$this->logger,
 		);
 	}
@@ -263,12 +267,19 @@ class AppInstallServiceTest extends TestCase {
 	private function wireInstall(string $appsDir, string $installedVersion = ''): void {
 		$this->pathResolver->method('resolveWritablePath')->willReturn($appsDir);
 		$this->tempManager->method('getTemporaryFile')->willReturn($appsDir . '/upload.tmp.zip');
+		// The DB answers $installedVersion until the upgrade routine has had
+		// its chance to run; from the second read on it reflects the code on
+		// disk, like a successful IAppManager::upgradeApp() would leave it.
+		$reads = 0;
+		$this->upgrader->installedVersionReader = static function (string $app) use ($appsDir, $installedVersion, &$reads): string {
+			if ($installedVersion === '' || $reads++ === 0) {
+				return $installedVersion;
+			}
+			$xml = simplexml_load_file($appsDir . '/' . $app . '/appinfo/info.xml');
+			return (string)$xml->version;
+		};
 		$this->config->method('getAppValue')->willReturnCallback(
-			static fn (string $app, string $key, $default) => match ($key) {
-				'max_upload_size_mb' => '20',
-				'installed_version' => $installedVersion,
-				default => $default,
-			},
+			static fn (string $app, string $key, $default) => $key === 'max_upload_size_mb' ? '20' : $default,
 		);
 	}
 
@@ -280,16 +291,205 @@ class AppInstallServiceTest extends TestCase {
 		);
 	}
 
+	public function testInstallsWrappedZipWithoutDirectoryEntries(): void {
+		// Zips built with ZipArchive::addFromString / `zip -D` / Python zipfile
+		// (and AppDrop's own template generator) carry no "app/" folder entry.
+		$appsDir = $this->makeAppsDir();
+		$this->wireInstall($appsDir);
+		$path = $appsDir . '/nodirs.zip';
+		$zip = new \ZipArchive();
+		$zip->open($path, \ZipArchive::CREATE);
+		$zip->addFromString(
+			'dropdemo/appinfo/info.xml',
+			'<?xml version="1.0"?><info><id>dropdemo</id><name>Demo</name><version>1.0.0</version></info>',
+		);
+		$zip->addFromString('dropdemo/lib/AppInfo/Application.php', '<?php');
+		$zip->close();
+
+		$result = $this->service->install(['name' => 'dropdemo.zip', 'tmp_name' => $path, 'error' => UPLOAD_ERR_OK]);
+
+		$this->assertTrue($result['success']);
+		$this->assertFileExists($appsDir . '/dropdemo/appinfo/info.xml');
+		$this->assertFileExists($appsDir . '/dropdemo/lib/AppInfo/Application.php');
+		$this->assertDirectoryDoesNotExist($appsDir . '/dropdemo/dropdemo');
+
+		$this->removeDir($appsDir);
+	}
+
+	public function testInstallsWrappedZipWithBackslashEntryNames(): void {
+		// Windows PowerShell 5 Compress-Archive writes "app\appinfo\info.xml".
+		$appsDir = $this->makeAppsDir();
+		$this->wireInstall($appsDir);
+		$path = $appsDir . '/backslash.zip';
+		$zip = new \ZipArchive();
+		$zip->open($path, \ZipArchive::CREATE);
+		$zip->addFromString('dropdemo/README.md', 'x');
+		$zip->addFromString(
+			'dropdemo/appinfo/info.xml',
+			'<?xml version="1.0"?><info><id>dropdemo</id><name>Demo</name><version>1.0.0</version></info>',
+		);
+		$zip->renameName('dropdemo/README.md', 'dropdemo\\README.md');
+		$zip->renameName('dropdemo/appinfo/info.xml', 'dropdemo\\appinfo\\info.xml');
+		$zip->close();
+
+		$result = $this->service->install(['name' => 'dropdemo.zip', 'tmp_name' => $path, 'error' => UPLOAD_ERR_OK]);
+
+		$this->assertTrue($result['success']);
+		$this->assertFileExists($appsDir . '/dropdemo/appinfo/info.xml');
+
+		$this->removeDir($appsDir);
+	}
+
+	public function testFlatZipWhoseFirstEntryIsAFolderKeepsThatFolder(): void {
+		// `cd myapp && zip -r ../myapp.zip .` → first entry "lib/": that is
+		// not a wrapper, the zip root already holds appinfo/info.xml.
+		$appsDir = $this->makeAppsDir();
+		$this->wireInstall($appsDir);
+		$path = $appsDir . '/flat.zip';
+		$zip = new \ZipArchive();
+		$zip->open($path, \ZipArchive::CREATE);
+		$zip->addEmptyDir('lib');
+		$zip->addFromString('lib/Thing.php', '<?php');
+		$zip->addEmptyDir('appinfo');
+		$zip->addFromString('appinfo/info.xml', '<?xml version="1.0"?><info><id>dropdemo</id><version>1.0.0</version></info>');
+		$zip->close();
+
+		$result = $this->service->install(['name' => 'flat.zip', 'tmp_name' => $path, 'error' => UPLOAD_ERR_OK]);
+
+		$this->assertTrue($result['success']);
+		$this->assertFileExists($appsDir . '/dropdemo/lib/Thing.php');
+		$this->assertFileExists($appsDir . '/dropdemo/appinfo/info.xml');
+
+		$this->removeDir($appsDir);
+	}
+
+	public function testAmbiguousPathProblemFlagsDuplicatesAndFileFolderClashes(): void {
+		$seen = [];
+		$this->assertNull(AppInstallService::ambiguousPathProblem('appinfo/', $seen));
+		$this->assertNull(AppInstallService::ambiguousPathProblem('appinfo/', $seen));
+		$this->assertNull(AppInstallService::ambiguousPathProblem('appinfo/info.xml', $seen));
+		$this->assertStringContainsString('more than once', (string)AppInstallService::ambiguousPathProblem('appinfo/info.xml', $seen));
+		// a path cannot be both a file and a folder: extraction would fail half-way
+		$this->assertStringContainsString('both a file and a folder', (string)AppInstallService::ambiguousPathProblem('appinfo/info.xml/x', $seen));
+		$this->assertNull(AppInstallService::ambiguousPathProblem('lib/a.php', $seen));
+		$this->assertStringContainsString('both a file and a folder', (string)AppInstallService::ambiguousPathProblem('lib', $seen));
+	}
+
+	#[DataProvider('aliasedInfoXmlProvider')]
+	public function testRejectsPathAliasesThatWouldOverwriteAnotherEntry(string $alias): void {
+		// "./appinfo/info.xml" or "appinfo//info.xml" land on the same file as
+		// "appinfo/info.xml" at extraction time but look different to analysis.
+		$appsDir = $this->makeAppsDir();
+		$this->wireInstall($appsDir);
+		$path = $appsDir . '/alias.zip';
+		$zip = new \ZipArchive();
+		$zip->open($path, \ZipArchive::CREATE);
+		$zip->addFromString('appinfo/info.xml', '<?xml version="1.0"?><info><id>dropdemo</id><version>1.0.0</version></info>');
+		$zip->addFromString('placeholder', '<?xml version="1.0"?><info><id>appdrop</id><version>9.9.9</version></info>');
+		$zip->renameName('placeholder', $alias);
+		$zip->close();
+
+		try {
+			$this->service->install(['name' => 'alias.zip', 'tmp_name' => $path, 'error' => UPLOAD_ERR_OK]);
+			$this->fail('expected AppInstallException');
+		} catch (AppInstallException $e) {
+			$this->assertStringContainsString('Invalid package', $e->getMessage());
+		}
+		$this->assertDirectoryDoesNotExist($appsDir . '/dropdemo');
+
+		$this->removeDir($appsDir);
+	}
+
+	public static function aliasedInfoXmlProvider(): array {
+		return [
+			'leading ./' => ['./appinfo/info.xml'],
+			'double slash' => ['appinfo//info.xml'],
+			'inner ./' => ['appinfo/./info.xml'],
+		];
+	}
+
+	public function testAcceptsRepeatedFolderEntriesAndDotsInsideFileNames(): void {
+		$appsDir = $this->makeAppsDir();
+		$this->wireInstall($appsDir);
+		$path = $appsDir . '/ok.zip';
+		$zip = new \ZipArchive();
+		$zip->open($path, \ZipArchive::CREATE);
+		$zip->addEmptyDir('dropdemo');
+		$zip->addEmptyDir('dropdemo/lib');
+		$zip->addFromString('dropdemo/tmpdir', '');
+		$zip->renameName('dropdemo/tmpdir', 'dropdemo/lib/');
+		$zip->addFromString('dropdemo/appinfo/info.xml', '<?xml version="1.0"?><info><id>dropdemo</id><version>1.0.0</version></info>');
+		$zip->addFromString('dropdemo/js/app..min.js', 'x');
+		$zip->close();
+
+		$result = $this->service->install(['name' => 'ok.zip', 'tmp_name' => $path, 'error' => UPLOAD_ERR_OK]);
+
+		$this->assertTrue($result['success']);
+		$this->assertFileExists($appsDir . '/dropdemo/js/app..min.js');
+
+		$this->removeDir($appsDir);
+	}
+
+	public function testUpdateGivesInfoXmlANewerMtimeThanTheReplacedOne(): void {
+		// Nextcloud caches the parsed info.xml by mtime: an update landing in
+		// the same second would upgrade to the OLD version → instance-wide 503.
+		$appsDir = $this->makeAppsDir();
+		$this->wireInstall($appsDir, '1.0.0');
+		$this->makeExistingApp($appsDir, 'dropdemo', '1.0.0');
+		$oldMtime = time() + 30;
+		touch($appsDir . '/dropdemo/appinfo/info.xml', $oldMtime);
+		$zip = $this->makeAppZip($appsDir, 'dropdemo', '1.1.0');
+		$this->appManager->method('upgradeApp')->willReturn(true);
+
+		$this->service->install(['name' => 'dropdemo.zip', 'tmp_name' => $zip, 'error' => UPLOAD_ERR_OK]);
+
+		clearstatcache();
+		$this->assertGreaterThan($oldMtime, filemtime($appsDir . '/dropdemo/appinfo/info.xml'));
+
+		$this->removeDir($appsDir);
+	}
+
+	public function testTwoUpdatesInTheSameSecondKeepBothBackups(): void {
+		$appsDir = $this->makeAppsDir();
+		$this->wireInstall($appsDir, '1.0.0');
+		$this->makeExistingApp($appsDir, 'dropdemo', '1.0.0');
+		$this->appManager->method('upgradeApp')->willReturn(true);
+
+		foreach (['1.1.0', '1.2.0'] as $version) {
+			$zip = $this->makeAppZip($appsDir, 'dropdemo', $version);
+			$this->service->install(['name' => 'dropdemo.zip', 'tmp_name' => $zip, 'error' => UPLOAD_ERR_OK]);
+		}
+
+		$this->assertCount(2, glob($appsDir . '/dropdemo_backup_*'));
+
+		$this->removeDir($appsDir);
+	}
+
+	public function testMessageDoesNotClaimEnabledWhenAutoEnableIsOff(): void {
+		$appsDir = $this->makeAppsDir();
+		$this->wireInstall($appsDir);
+		$zip = $this->makeAppZip($appsDir, 'dropdemo', '1.0.0');
+
+		$result = $this->service->install(['name' => 'dropdemo.zip', 'tmp_name' => $zip, 'error' => UPLOAD_ERR_OK], false);
+
+		$this->assertStringNotContainsString('enabled', $result['message']);
+		$this->assertSame([], $this->upgrader->occCalls);
+
+		$this->removeDir($appsDir);
+	}
+
 	public function testFreshInstallEnablesButDoesNotUpgrade(): void {
 		$appsDir = $this->makeAppsDir();
 		$this->wireInstall($appsDir);
 		$zip = $this->makeAppZip($appsDir, 'dropdemo', '1.0.0');
 
 		$this->appManager->expects($this->never())->method('upgradeApp');
-		$this->appManager->expects($this->once())->method('enableApp')->with('dropdemo');
+		// never installed → the installer (occ app:enable) must run, not the bare enable flag
+		$this->appManager->expects($this->never())->method('enableApp');
 
 		$result = $this->service->install(['name' => 'dropdemo.zip', 'tmp_name' => $zip, 'error' => UPLOAD_ERR_OK]);
 
+		$this->assertSame(['dropdemo'], $this->upgrader->occCalls);
 		$this->assertTrue($result['success']);
 		$this->assertFalse($result['isUpdate']);
 		$this->assertSame('1.0.0', $result['version']);

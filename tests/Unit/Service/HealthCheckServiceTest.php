@@ -64,6 +64,64 @@ class HealthCheckServiceTest extends TestCase {
 	// Archive validation
 	// =========================================================================
 
+	public function testAnalyzeFindsInfoXmlInWrappedZipWithoutDirectoryEntries(): void {
+		$path = $this->tmpDir . '/nodirs.zip';
+		$zip = new \ZipArchive();
+		$zip->open($path, \ZipArchive::CREATE | \ZipArchive::OVERWRITE);
+		$zip->addFromString('test_app/appinfo/info.xml', $this->validInfoXml());
+		$zip->close();
+
+		$result = $this->service->analyze($path);
+
+		$this->assertSame('test_app', $result['appId']);
+	}
+
+	public function testAnalyzeFlagsZipsTheInstallerWouldRejectAsAmbiguous(): void {
+		$path = $this->tmpDir . '/dup.zip';
+		$zip = new \ZipArchive();
+		$zip->open($path, \ZipArchive::CREATE | \ZipArchive::OVERWRITE);
+		$zip->addFromString('appinfo/info.xml', $this->validInfoXml('first_app'));
+		$zip->addFromString('placeholder', $this->validInfoXml('other_app'));
+		$zip->renameName('placeholder', './appinfo/info.xml');
+		$zip->close();
+
+		$result = $this->service->analyze($path);
+
+		$this->assertNotEmpty($result['errors']);
+		$this->assertStringContainsString('Invalid package', implode(' ', $result['errors']));
+	}
+
+	public function testAbsolutePathIsReportedOnce(): void {
+		$path = $this->tmpDir . '/abs.zip';
+		$zip = new \ZipArchive();
+		$zip->open($path, \ZipArchive::CREATE | \ZipArchive::OVERWRITE);
+		$zip->addFromString('appinfo/info.xml', $this->validInfoXml());
+		$zip->addFromString('placeholder', 'x');
+		$zip->renameName('placeholder', '/tmp/evil.php');
+		$zip->close();
+
+		$result = $this->service->analyze($path);
+
+		$this->assertCount(1, array_filter($result['errors'], static fn (string $e) => str_contains($e, 'evil.php')));
+	}
+
+	public function testMissingNextcloudDependencyHintDoesNotHardCodeAVersionCap(): void {
+		$zip = $this->createZip([
+			'test_app/appinfo/info.xml' => '<?xml version="1.0"?><info><id>test_app</id><name>T</name><version>1.0.0</version></info>',
+		]);
+
+		$result = $this->service->analyze($zip);
+
+		$hint = '';
+		foreach ($result['checks'] as $check) {
+			if ($check['label'] === 'Nextcloud Compatibility') {
+				$hint = $check['fix'] ?? '';
+			}
+		}
+		$this->assertStringContainsString('max-version', $hint);
+		$this->assertDoesNotMatchRegularExpression('/max-version="\d+"/', $hint);
+	}
+
 	public function testAnalyzeInvalidZipReturnsError(): void {
 		$path = $this->tmpDir . '/bad.zip';
 		file_put_contents($path, 'not a zip');

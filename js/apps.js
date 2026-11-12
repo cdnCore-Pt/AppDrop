@@ -67,6 +67,12 @@
                 + '<td><span class="aum-badge ' + statusClass + '">' + statusText + '</span></td>'
                 + '<td class="aum-actions">';
 
+            if (app.id === 'appdrop') {
+                // AppDrop cannot disable or remove itself (the server refuses)
+                html += '</td></tr>';
+                return;
+            }
+
             if (app.enabled) {
                 html += '<button class="aum-btn aum-btn--small aum-btn--warning" '
                     + 'data-action="disable" data-app="' + escapeHtml(app.id) + '">Disable</button>';

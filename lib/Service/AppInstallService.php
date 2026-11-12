@@ -77,6 +77,7 @@ class AppInstallService {
 			// Check for existing installation
 			$isUpdate = is_dir($targetPath);
 			$previousVersion = null;
+			$previousMtime = $isUpdate ? (int)@filemtime($targetPath . '/appinfo/info.xml') : 0;
 
 			if ($isUpdate) {
 				$existing = $this->readInfoXmlSafe($targetPath . '/appinfo/info.xml');
@@ -95,13 +96,17 @@ class AppInstallService {
 			}
 
 			$this->extractZip($tempPath, $targetPath, $zipInfo['topLevelPrefix']);
+			// Nextcloud caches the parsed info.xml by mtime (1 s resolution): an
+			// update in the same second as the previous one would be upgraded
+			// "to" the old version and leave the instance in upgrade-needed 503.
+			touch($targetPath . '/appinfo/info.xml', max(time(), $previousMtime + 1));
 			$this->ensureAppIcon($targetPath, $appId);
 			$this->chmodRecursive($targetPath);
 			// Update, or re-install after a remove (neither AppDrop nor `occ app:remove`
 			// clears installed_version): bring the DB in line with the new code.
 			$this->upgrader->reconcile($appId, $targetPath);
 			if ($autoEnable) {
-				$this->enableApp($appId);
+				$this->upgrader->enable($appId);
 			}
 		} finally {
 			if (file_exists($tempPath)) {
@@ -111,7 +116,7 @@ class AppInstallService {
 
 		$message = $isUpdate
 			? "App '{$zipInfo['name']}' updated successfully (v{$previousVersion} → v{$zipInfo['version']})."
-			: "App '{$zipInfo['name']}' (v{$zipInfo['version']}) installed and enabled successfully.";
+			: "App '{$zipInfo['name']}' (v{$zipInfo['version']}) installed" . ($autoEnable ? ' and enabled' : '') . ' successfully.';
 
 		return [
 			'success' => true,
@@ -195,6 +200,7 @@ class AppInstallService {
 
 		$topLevelPrefix = '';
 		$infoXmlContent = null;
+		$seen = [];
 
 		for ($i = 0; $i < $zip->numFiles; $i++) {
 			$name = $zip->getNameIndex($i);
@@ -219,15 +225,20 @@ class AppInstallService {
 				}
 			}
 
-			// Detect top-level wrapper directory from first entry
-			if ($i === 0 && str_ends_with($normalised, '/') && substr_count($normalised, '/') === 1) {
-				$topLevelPrefix = $normalised;
+			if ($i === 0) {
+				$topLevelPrefix = self::detectTopLevelPrefix($zip);
 			}
 
 			// Compute relative path (stripping top-level wrapper if present)
 			$relativePath = $normalised;
 			if ($topLevelPrefix !== '' && str_starts_with($normalised, $topLevelPrefix)) {
 				$relativePath = substr($normalised, strlen($topLevelPrefix));
+			}
+
+			$problem = self::ambiguousPathProblem($relativePath, $seen);
+			if ($problem !== null) {
+				$zip->close();
+				throw new AppInstallException($problem);
 			}
 
 			if ($relativePath === 'appinfo/info.xml') {
@@ -247,6 +258,83 @@ class AppInstallService {
 		$info['topLevelPrefix'] = $topLevelPrefix;
 
 		return $info;
+	}
+
+	/**
+	 * Extraction reads entries by name, analysis by index, so two entries that
+	 * land on the same file ("a/b" twice, or "a/b" next to "./a/b" / "a//b")
+	 * would let them disagree about appinfo/info.xml; and a path used both as
+	 * a file and as a folder aborts the extraction half-way. Returns the
+	 * reason to reject $relativePath, or null; records paths in $seen.
+	 *
+	 * @param array<string, true> $seen
+	 */
+	public static function ambiguousPathProblem(string $relativePath, array &$seen): ?string {
+		if ($relativePath === '') {
+			return null;
+		}
+		$isFolder = str_ends_with($relativePath, '/');
+		$segments = explode('/', rtrim($relativePath, '/'));
+		if (in_array('', $segments, true) || in_array('.', $segments, true)) {
+			return "Invalid package: entry '{$relativePath}' has an empty or '.' path segment.";
+		}
+
+		// Folders are keyed with a trailing '/', files without.
+		$file = $isFolder ? null : implode('/', $segments);
+		$folders = [];
+		$path = '';
+		foreach ($isFolder ? $segments : array_slice($segments, 0, -1) as $segment) {
+			$path .= ($path === '' ? '' : '/') . $segment;
+			$folders[] = $path;
+		}
+		foreach ($folders as $folder) {
+			if (isset($seen[$folder])) {
+				return "Invalid package: '{$folder}' is both a file and a folder in the zip.";
+			}
+		}
+		if ($file !== null && isset($seen[$file . '/'])) {
+			return "Invalid package: '{$file}' is both a file and a folder in the zip.";
+		}
+		if ($file !== null && isset($seen[$file])) {
+			return "Invalid package: '{$file}' appears more than once in the zip.";
+		}
+
+		foreach ($folders as $folder) {
+			$seen[$folder . '/'] = true; // folder entries may repeat harmlessly
+		}
+		if ($file !== null) {
+			$seen[$file] = true;
+		}
+		return null;
+	}
+
+	/**
+	 * Top-level wrapper directory ("myapp/") of a zip, or '' for a flat zip.
+	 *
+	 * The wrapper is the first path segment of the first entry, provided it
+	 * holds appinfo/info.xml and the zip root does not. This does not rely on
+	 * folder entries: many tools (ZipArchive::addFromString, `zip -D`, Python
+	 * zipfile, Windows Compress-Archive) write none, and in a flat zip made
+	 * with `zip -r` the first entry is just the app's own "lib/" folder.
+	 */
+	public static function detectTopLevelPrefix(\ZipArchive $zip): string {
+		$names = [];
+		for ($i = 0; $i < $zip->numFiles; $i++) {
+			$names[] = str_replace('\\', '/', (string)$zip->getNameIndex($i));
+		}
+		// Flat app: whatever comes first ("lib/", "css/x.css") is app content.
+		if (in_array('appinfo/info.xml', $names, true)) {
+			return '';
+		}
+		$slash = strpos($names[0] ?? '', '/');
+		if ($slash === false) {
+			return '';
+		}
+		$prefix = substr($names[0], 0, $slash + 1);
+		if (in_array($prefix, ['/', './', '../'], true) || !in_array($prefix . 'appinfo/info.xml', $names, true)) {
+			return '';
+		}
+		return $prefix;
 	}
 
 	// =========================================================================
@@ -306,7 +394,7 @@ class AppInstallService {
 	// =========================================================================
 
 	private function backupDirectory(string $path): void {
-		$backup = $path . '_backup_' . date('Ymd_His');
+		$backup = BackupService::freeBackupPath($path);
 		$this->logger->info("[AppDrop] Backing up '{$path}' to '{$backup}'.");
 
 		if (!rename($path, $backup)) {
@@ -369,7 +457,7 @@ class AppInstallService {
 			}
 
 			// Defence-in-depth
-			if (str_contains($relative, '..')) {
+			if (in_array('..', explode('/', $relative), true)) {
 				$zip->close();
 				throw new AppInstallException("Traversal in entry '{$name}'.");
 			}
@@ -405,44 +493,6 @@ class AppInstallService {
 		}
 
 		$zip->close();
-	}
-
-	// =========================================================================
-	// Enable app
-	// =========================================================================
-
-	/**
-	 * Enable the app after extraction.
-	 *
-	 * For updates (app already known), IAppManager works directly.
-	 * For new installs, the in-memory app cache was built at boot and doesn't
-	 * include the newly extracted app. We fall back to running occ in a
-	 * subprocess which forces a fresh filesystem scan.
-	 */
-	private function enableApp(string $appId): void {
-		// Try native API first (works for updates of already-known apps)
-		try {
-			$this->appManager->enableApp($appId);
-			return;
-		} catch (\Throwable $e) {
-			$this->logger->info('[AppDrop] Native enableApp failed, falling back to occ: ' . $e->getMessage());
-		}
-
-		// Fallback: occ in a subprocess (fresh cache scan)
-		$occ = \OC::$SERVERROOT . '/occ';
-		$escapedAppId = escapeshellarg($appId);
-		$escapedOcc = escapeshellarg($occ);
-
-		exec("php {$escapedOcc} app:enable {$escapedAppId} 2>&1", $output, $exitCode);
-
-		if ($exitCode !== 0) {
-			$msg = implode(' ', $output);
-			$this->logger->warning("[AppDrop] occ app:enable failed: {$msg}");
-			throw new AppInstallException(
-				'App files were installed successfully but could not be enabled automatically. '
-				. "Please enable '{$appId}' manually in Settings → Apps.",
-			);
-		}
 	}
 
 	// =========================================================================

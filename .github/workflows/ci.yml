@@ -11,7 +11,7 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        php-version: ['8.2', '8.3', '8.4']
+        php-version: ['8.2', '8.3', '8.4', '8.5']
     name: PHPUnit (PHP ${{ matrix.php-version }})
     steps:
       - uses: actions/checkout@v4
@@ -44,6 +44,32 @@ jobs:
 
       - name: Install dependencies
         run: composer install --no-interaction --prefer-dist
+
+      - name: Run Psalm
+        run: php vendor/psalm/phar/psalm.phar --no-cache
+
+  ocp-latest:
+    runs-on: ubuntu-latest
+    name: PHPUnit + Psalm against OCP 35
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.3'
+          extensions: dom, xml, xmlwriter, mbstring, zip, json
+          coverage: none
+
+      # composer.json pins nextcloud/ocp ^33 (newest that installs on PHP 8.2);
+      # this job re-runs the checks against the newest supported server API.
+      - name: Install dependencies with nextcloud/ocp ^35
+        run: |
+          composer config platform.php 8.3
+          composer require --dev nextcloud/ocp:^35.0 -W --no-interaction
+
+      - name: Run tests
+        run: ./vendor/bin/phpunit
 
       - name: Run Psalm
         run: php vendor/psalm/phar/psalm.phar --no-cache

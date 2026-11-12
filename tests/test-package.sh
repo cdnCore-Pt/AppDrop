@@ -70,6 +70,13 @@ for d, _, fs in os.walk(root):
     for f in fs:
         present.add(os.path.relpath(os.path.join(d, f), root))
 present.discard("appinfo/signature.json")
+import hashlib
+sig = json.load(open(os.path.join(root, "appinfo", "signature.json")))["hashes"]
+stale = sorted(f for f, h in sig.items() if f in present and hashlib.sha512(open(os.path.join(root, f), "rb").read()).hexdigest() != h)
+if stale:
+    for f in stale:
+        print("stale hash (re-sign needed):", f)
+    sys.exit(1)
 miss, extra = sorted(hashes - present), sorted(present - hashes)
 if miss or extra:
     for m in miss:

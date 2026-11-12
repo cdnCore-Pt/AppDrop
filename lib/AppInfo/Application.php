@@ -22,10 +22,12 @@ use OCP\IUserSession;
  * Application bootstrap for appdrop.
  *
  * Navigation is registered only when the current user has upload permission.
- * We avoid using a closure with INavigationManager::add() because NC 32's
- * NavigationManager crashes if the closure returns null or an empty array
- * (it tries to access $entry['id'] unconditionally). Instead, we check
- * permissions at boot() time and skip registration entirely if denied.
+ * The permission check runs at boot() time and registration is skipped when
+ * denied: NC 32's NavigationManager crashes on a closure that returns null or
+ * an empty array. The entry itself IS a closure (always a complete array):
+ * an array entry makes NavigationManager::add() resolve every app's nav
+ * routes right here, before the other apps are loaded, which left their
+ * header links (Files, ...) empty on NC 30-34.
  */
 class Application extends App implements IBootstrap {
 	public const APP_ID = 'appdrop';
@@ -38,7 +40,7 @@ class Application extends App implements IBootstrap {
 	}
 
 	public function boot(IBootContext $context): void {
-		$server = $context->getServerContainer();
+		$server = $context->getAppContainer();
 
 		try {
 			$user = $server->get(IUserSession::class)->getUser();
@@ -54,14 +56,15 @@ class Application extends App implements IBootstrap {
 			return;
 		}
 
-		$urlGenerator = $server->get(IURLGenerator::class);
-
-		$server->get(INavigationManager::class)->add([
-			'id' => self::APP_ID,
-			'name' => 'AppDrop',
-			'href' => $urlGenerator->linkToRoute('appdrop.admin.index'),
-			'icon' => $urlGenerator->imagePath(self::APP_ID, 'app.svg'),
-			'order' => 90,
-		]);
+		$server->get(INavigationManager::class)->add(static function () use ($server): array {
+			$urlGenerator = $server->get(IURLGenerator::class);
+			return [
+				'id' => self::APP_ID,
+				'name' => 'AppDrop',
+				'href' => $urlGenerator->linkToRoute('appdrop.admin.index'),
+				'icon' => $urlGenerator->imagePath(self::APP_ID, 'app.svg'),
+				'order' => 90,
+			];
+		});
 	}
 }
